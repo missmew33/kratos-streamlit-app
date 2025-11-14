@@ -101,11 +101,17 @@ def load_demo_file() -> io.BytesIO | None:
 
 
 def _infer_gender(detector: gender.Detector, author: str) -> str:
-    """Infer gender from first name, normalising 'andy' → 'unknown'."""
-    if pd.isna(author) or not isinstance(author, str) or not author.strip():
+    """
+    Infer gender from the first author's given name using gender-guesser.
+    'andy' (and ambiguous cases) are mapped to 'unknown'.
+    """
+    given_name = extract_first_author_given_name(author)
+    if not given_name:
         return "unknown"
-    first_name = author.split()[0].replace("-", "")
-    g = detector.get_gender(first_name)
+
+    g = detector.get_gender(given_name)
+
+    # Map ambiguous to unknown
     if g == "andy":
         return "unknown"
     return g
@@ -120,8 +126,16 @@ def add_gender_column(df: pd.DataFrame,
         st.warning(f"Column '{author_col}' not found. Gender set to 'unknown'.")
         df[new_col] = "unknown"
         return df
-    df[new_col] = df[author_col].astype(str).apply(lambda x: _infer_gender(det, x))
-    return df
+df[new_col] = df[author_col].astype(str).apply(lambda x: _infer_gender(det, x))
+
+# Collapse 'mostly_female' and 'mostly_male' into binary categories
+mapping = {
+    "mostly_female": "female",
+    "mostly_male": "male",
+}
+df[new_col] = df[new_col].replace(mapping)
+
+return df
 
 
 def extract_country_from_affiliation(s: str) -> str:
