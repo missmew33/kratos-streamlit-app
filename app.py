@@ -527,11 +527,12 @@ def main():
         """
     )
 
+    # ---------------- Sidebar: data input ----------------
     st.sidebar.header("1. Data input")
     use_demo = st.sidebar.checkbox("Use demo_scopus.csv from data/", value=True)
     uploaded = st.sidebar.file_uploader(
         "Upload a Scopus-style CSV file",
-        type=["csv"]
+        type=["csv"],
     )
 
     if use_demo and uploaded is None:
@@ -541,82 +542,76 @@ def main():
         st.info("Upload a CSV file or enable the demo dataset to start.")
         return
 
-    # IMPORTANT: robust CSV reader
+    # Robust CSV reader
     df = read_scopus_csv(uploaded)
 
     st.subheader("Raw data (first 5 rows)")
     st.dataframe(df.head(), use_container_width=True)
 
+    # ---------------- Sidebar: parameters ----------------
     st.sidebar.header("2. Columns and parameters")
-    author_col = st.sidebar.text_input("Author column", "Authors")
+    author_col = st.sidebar.text_input("Author column", "Author full names")
     country_col = st.sidebar.text_input("Country column", "Country")
     citations_col = st.sidebar.text_input("Citations / impact column", "Cited by")
 
     lambda_entropy = st.sidebar.slider(
         "λ (weight of entropy in KCDI)",
-        0.0, 1.0, 0.5, 0.05
+        0.0, 1.0, 0.5, 0.05,
     )
 
-    # Enrich data
+    # ---------------- Data enrichment ----------------
     df = ensure_country_column(df, country_col=country_col)
     df = add_gender_column(df, author_col=author_col, new_col="gender")
     df = add_region_column(df, country_col=country_col, new_col="region")
 
     st.subheader("Enriched data (author, gender, country, region)")
-    cols_show = [c for c in [author_col, "gender", country_col, "region"] if c in df.columns]
+    cols_show = [
+        c for c in [author_col, "gender", country_col, "region"]
+        if c in df.columns
+    ]
     st.dataframe(df[cols_show].head(), use_container_width=True)
 
-tab_kcdi, tab_kji, tab_trends, tab_authors, tab_notes = st.tabs(
-    ["KCDI", "KJI / KRATOS", "Trends", "Author / Institution explorer", "Methodological notes"]
-)
+    # ---------------- Tabs ----------------
+    tab_kcdi, tab_kji, tab_trends, tab_authors, tab_notes = st.tabs(
+        ["KCDI", "KJI / KRATOS", "Trends", "Author / Institution explorer", "Methodological notes"]
+    )
 
-
+    # --- Tab: KCDI ---
     with tab_kcdi:
         st.markdown("### KCDI by gender and region")
+
         kcdi_table = compute_kcdi(
             df,
             group_cols=["gender", "region"],
             weight_col=citations_col if citations_col in df.columns else None,
-            lambda_entropy=lambda_entropy
+            lambda_entropy=lambda_entropy,
         )
         st.dataframe(kcdi_table, use_container_width=True)
         plot_kcdi_bar(kcdi_table)
-                st.markdown("#### Share of documents by gender–region")
+
+        st.markdown("#### Share of documents by gender–region")
         plot_group_share(df, gender_col="gender", region_col="region")
 
-
+    # --- Tab: KJI / KRATOS ---
     with tab_kji:
         st.markdown("### KJI – Knowledge Justice Index")
+
         kratos_table = compute_kratos(
             df,
             group_cols=["gender", "region"],
             weight_col=citations_col if citations_col in df.columns else None,
-            lambda_entropy=lambda_entropy
+            lambda_entropy=lambda_entropy,
         )
         st.dataframe(kratos_table, use_container_width=True)
         plot_kji_bar(kratos_table)
+
+    # --- Tab: Trends ---
     with tab_trends:
         st.markdown("### Temporal trends")
         st.markdown("Share of documents by gender across years.")
         plot_gender_trend(df)
 
-    with tab_notes:
-        st.markdown(
-            """
-            **Summary**
-
-            - KCDI combines normalised Shannon entropy and normalised mean
-              weight (e.g. citations), controlled by λ.
-            - KJI multiplies KCDI by two fairness factors:
-              participation (A) and recognition (S).
-            - Groups are defined here as intersections of gender and region.
-            """
-        )
-
-
-if __name__ == "__main__":
-    main()
-
+    # --- Tab: Author / Institution explorer ---
     with tab_authors:
         st.markdown("### Author / Institution explorer")
 
@@ -625,7 +620,6 @@ if __name__ == "__main__":
             "",
         )
 
-        # Columns to show if available
         cols_interest = [
             "Authors",
             "Author full names",
@@ -652,3 +646,19 @@ if __name__ == "__main__":
 
         st.dataframe(df_show.head(500), use_container_width=True)
         st.caption("Showing up to 500 rows (filtered).")
+
+    # --- Tab: Methodological notes ---
+    with tab_notes:
+        st.markdown(
+            """
+            **Summary**
+
+            - KCDI combines normalised Shannon entropy and normalised mean
+              weight (e.g. citations), controlled by λ.
+            - KJI multiplies KCDI by two fairness factors:
+              participation (A) and recognition (S).
+            - Groups are defined here as intersections of gender and region.
+            """
+        )
+if __name__ == "__main__":
+    main()
