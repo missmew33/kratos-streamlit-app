@@ -18,80 +18,25 @@ st.set_page_config(
     layout="wide"
 )
 
+
+# ------------------------------------------------------------
+# Data loading
+# ------------------------------------------------------------
 def read_scopus_csv(file_obj) -> pd.DataFrame:
     """
     Robust reader for Scopus-style CSV files.
-    Tries comma-separated first; if it fails, tries semicolon.
-    Skips badly formatted lines instead of raising a ParserError.
+
+    - Tries comma-separated first; if it fails, tries semicolon.
+    - Skips badly formatted lines instead of raising a ParserError.
     """
-    # First attempt: comma-separated
     try:
         file_obj.seek(0)
-        return pd.read_csv(
-            file_obj,
-            engine="python",
-            on_bad_lines="skip"
-        )
+        return pd.read_csv(file_obj, engine="python", on_bad_lines="skip")
     except Exception:
-        pass
+        file_obj.seek(0)
+        return pd.read_csv(file_obj, sep=";", engine="python", on_bad_lines="skip")
 
-    # Second attempt: semicolon-separated
-    file_obj.seek(0)
-    return pd.read_csv(
-        file_obj,
-        sep=";",
-        engine="python",
-        on_bad_lines="skip"
-    )
 
-def extract_first_author_given_name(raw: str) -> str:
-    """
-    Extract the given name of the first author from a Scopus-style
-    'Authors' or 'Author full names' field.
-
-    Examples of inputs:
-    - "Bao, Guotai"
-    - "Divya; M., Narwal, Mahabir"
-    - "Jog, Deepti; N.A., Alcasoas, Nelissa Andrea"
-    """
-    if pd.isna(raw) or not isinstance(raw, str):
-        return ""
-
-    s = raw.strip()
-
-    # Some Scopus exports include line breaks; keep only the first line
-    s = s.splitlines()[0]
-
-    # 1) Take the first author (authors separated by ';')
-    first_author = s.split(";")[0].strip()
-
-    # 2) Scopus pattern is usually "Surname, Given names"
-    if "," in first_author:
-        parts = first_author.split(",", 1)
-        given_part = parts[1].strip()
-    else:
-        given_part = first_author
-
-    # 3) Remove IDs, parentheses, numbers
-    given_part = re.sub(r"\(.*?\)", "", given_part)
-    given_part = re.sub(r"\d", "", given_part)
-
-    # 4) Split into tokens, remove punctuation, keep tokens with ≥2 letters
-    tokens = given_part.replace("-", " ").split()
-    clean_tokens = [
-        re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ]", "", t) for t in tokens
-    ]
-    clean_tokens = [t for t in clean_tokens if len(t) >= 2]
-
-    if not clean_tokens:
-        return ""
-
-    # Often the last token is the actual given name ("Mahabir", "Deepti")
-    return clean_tokens[-1]
-
-# ------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------
 def load_demo_file() -> io.BytesIO | None:
     """Load demo_scopus.csv from data/ if it exists."""
     demo_path = Path(__file__).parent / "data" / "demo_scopus.csv"
@@ -100,6 +45,9 @@ def load_demo_file() -> io.BytesIO | None:
     return None
 
 
+# ------------------------------------------------------------
+# Author / gender / region helpers
+# ------------------------------------------------------------
 def extract_first_author_given_name(raw: str) -> str:
     """
     Extract the given name of the first author from a Scopus-style
@@ -158,9 +106,11 @@ def _infer_gender(detector: gender.Detector, author: str) -> str:
     return g
 
 
-def add_gender_column(df: pd.DataFrame,
-                      author_col: str = "Authors",
-                      new_col: str = "gender") -> pd.DataFrame:
+def add_gender_column(
+    df: pd.DataFrame,
+    author_col: str = "Authors",
+    new_col: str = "gender"
+) -> pd.DataFrame:
     det = gender.Detector(case_sensitive=False)
     df = df.copy()
 
@@ -170,15 +120,10 @@ def add_gender_column(df: pd.DataFrame,
         return df
 
     # Infer gender for each row
-    df[new_col] = df[author_col].astype(str).apply(
-        lambda x: _infer_gender(det, x)
-    )
+    df[new_col] = df[author_col].astype(str).apply(lambda x: _infer_gender(det, x))
 
     # Collapse 'mostly_female'/'mostly_male' into female/male
-    mapping = {
-        "mostly_female": "female",
-        "mostly_male": "male",
-    }
+    mapping = {"mostly_female": "female", "mostly_male": "male"}
     df[new_col] = df[new_col].replace(mapping)
 
     return df
@@ -195,8 +140,10 @@ def extract_country_from_affiliation(s: str) -> str:
     return parts[-1] if parts else ""
 
 
-def ensure_country_column(df: pd.DataFrame,
-                          country_col: str = "Country") -> pd.DataFrame:
+def ensure_country_column(
+    df: pd.DataFrame,
+    country_col: str = "Country"
+) -> pd.DataFrame:
     """
     If 'Country' does not exist but 'Affiliations' does, create it
     from the last element of the affiliation string.
@@ -204,11 +151,13 @@ def ensure_country_column(df: pd.DataFrame,
     df = df.copy()
     if country_col in df.columns:
         return df
+
     if "Affiliations" in df.columns:
         df[country_col] = df["Affiliations"].astype(str).apply(
             extract_country_from_affiliation
         )
         return df
+
     st.warning(
         "No 'Country' or 'Affiliations' column found; region will be 'Unknown'."
     )
@@ -216,9 +165,11 @@ def ensure_country_column(df: pd.DataFrame,
     return df
 
 
-def add_region_column(df: pd.DataFrame,
-                      country_col: str = "Country",
-                      new_col: str = "region") -> pd.DataFrame:
+def add_region_column(
+    df: pd.DataFrame,
+    country_col: str = "Country",
+    new_col: str = "region"
+) -> pd.DataFrame:
     df = df.copy()
     if country_col not in df.columns:
         st.warning(f"Column '{country_col}' not found. Region set to 'Unknown'.")
@@ -252,7 +203,7 @@ def compute_kcdi(
     df: pd.DataFrame,
     group_cols: list[str],
     weight_col: str | None = None,
-    lambda_entropy: float = 0.5
+    lambda_entropy: float = 0.5,
 ) -> pd.DataFrame:
     """
     KCDI(u) = H'(u)^λ * W_norm(u)^(1-λ),
@@ -320,7 +271,7 @@ def compute_kratos(
     df: pd.DataFrame,
     group_cols: list[str],
     weight_col: str | None = None,
-    lambda_entropy: float = 0.5
+    lambda_entropy: float = 0.5,
 ) -> pd.DataFrame:
     """
     Returns per group:
@@ -337,13 +288,18 @@ def compute_kratos(
     summary = g[weight_col].agg(
         n_docs="count",
         total_weight="sum",
-        mean_weight="mean"
+        mean_weight="mean",
     ).reset_index()
 
     if summary.empty:
         cols = group_cols + [
-            "H_prime", "W_bar", "W_norm", "KCDI",
-            "A_factor", "S_factor", "KJI"
+            "H_prime",
+            "W_bar",
+            "W_norm",
+            "KCDI",
+            "A_factor",
+            "S_factor",
+            "KJI",
         ]
         return pd.DataFrame(columns=cols)
 
@@ -351,16 +307,17 @@ def compute_kratos(
         df=data,
         group_cols=group_cols,
         weight_col=weight_col,
-        lambda_entropy=lambda_entropy
+        lambda_entropy=lambda_entropy,
     )
 
     res = pd.merge(
         kcdi_df,
         summary[group_cols + ["n_docs", "total_weight"]],
         on=group_cols,
-        how="left"
+        how="left",
     )
 
+    # Participation fairness (A)
     N = res["n_docs"].sum()
     G = (res["n_docs"] > 0).sum()
     if N <= 0 or G == 0:
@@ -374,6 +331,7 @@ def compute_kratos(
 
         res["A_factor"] = res["n_docs"].apply(participation_fairness)
 
+    # Recognition fairness (S)
     C = res["total_weight"].sum()
     if C <= 0:
         res["S_factor"] = 0.0
@@ -399,7 +357,7 @@ def compute_kratos(
 
 
 # ------------------------------------------------------------
-# Plots
+# Plot helpers
 # ------------------------------------------------------------
 def plot_kcdi_bar(df: pd.DataFrame, gender_col="gender", region_col="region"):
     if df.empty:
@@ -438,20 +396,21 @@ def plot_kji_bar(df: pd.DataFrame, gender_col="gender", region_col="region"):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-def plot_group_share(df: pd.DataFrame,
-                     gender_col: str = "gender",
-                     region_col: str = "region"):
-    """
-    Show how many documents belong to each gender–region group (counts + share).
-    """
+
+def plot_group_share(
+    df: pd.DataFrame,
+    gender_col: str = "gender",
+    region_col: str = "region",
+):
+    """Share of documents by gender–region group."""
     if df.empty:
         st.info("No data to plot.")
         return
 
     g = (
         df.groupby([gender_col, region_col])
-          .size()
-          .reset_index(name="n_docs")
+        .size()
+        .reset_index(name="n_docs")
     )
     total = g["n_docs"].sum()
     if total == 0:
@@ -494,8 +453,8 @@ def plot_gender_trend(df: pd.DataFrame):
 
     g = (
         d.groupby(["Year", "gender"])
-         .size()
-         .reset_index(name="n_docs")
+        .size()
+        .reset_index(name="n_docs")
     )
     g["total_year"] = g.groupby("Year")["n_docs"].transform("sum")
     g["share"] = g["n_docs"] / g["total_year"]
@@ -514,6 +473,93 @@ def plot_gender_trend(df: pd.DataFrame):
     )
     st.plotly_chart(fig, use_container_width=True)
 
+
+def plot_gender_trend_stacked(df: pd.DataFrame):
+    """Stacked area composition by gender across years."""
+    if "Year" not in df.columns:
+        st.info("No 'Year' column found; cannot compute temporal trends.")
+        return
+
+    d = df.copy()
+    d["Year"] = pd.to_numeric(d["Year"], errors="coerce")
+    d = d.dropna(subset=["Year"])
+    if d.empty:
+        st.info("Year values are missing or invalid; cannot compute trends.")
+        return
+
+    d["Year"] = d["Year"].astype(int)
+
+    g = (
+        d.groupby(["Year", "gender"])
+        .size()
+        .reset_index(name="n_docs")
+    )
+    g["total_year"] = g.groupby("Year")["n_docs"].transform("sum")
+    g["share"] = g["n_docs"] / g["total_year"]
+
+    fig = px.area(
+        g,
+        x="Year",
+        y="share",
+        color="gender",
+        groupnorm="fraction",
+    )
+    fig.update_layout(
+        xaxis_title="Year",
+        yaxis_title="Share of documents (stacked)",
+        yaxis_tickformat=".0%",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def plot_kji_heatmap(kratos_table: pd.DataFrame):
+    if kratos_table.empty:
+        st.info("No KJI data for heatmap.")
+        return
+    pivot = kratos_table.pivot_table(
+        index="gender", columns="region", values="KJI", aggfunc="mean"
+    )
+
+    fig = px.imshow(
+        pivot,
+        text_auto=".3f",
+        aspect="auto",
+        labels=dict(x="Region", y="Gender", color="KJI"),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+# ------------------------------------------------------------
+# Author summary
+# ------------------------------------------------------------
+def summarise_authors(df: pd.DataFrame, author_col: str, citations_col: str):
+    """Aggregate at author level: docs, citations, modal gender/region."""
+    d = df.copy()
+    if author_col not in d.columns:
+        return pd.DataFrame()
+
+    if citations_col not in d.columns:
+        d[citations_col] = 1
+
+    g = (
+        d.groupby(author_col)
+        .agg(
+            total_cites=(citations_col, "sum"),
+            n_docs=("Year", "count"),
+            gender_mode=(
+                "gender",
+                lambda x: x.mode().iat[0] if not x.mode().empty else "unknown",
+            ),
+            region_mode=(
+                "region",
+                lambda x: x.mode().iat[0] if not x.mode().empty else "Unknown",
+            ),
+        )
+        .reset_index()
+    )
+    return g
+
+
 # ------------------------------------------------------------
 # Streamlit layout
 # ------------------------------------------------------------
@@ -522,12 +568,12 @@ def main():
 
     st.markdown(
         """
-        This app implements your **KRATOS / KJI framework** to analyse
+        This app implements **KRATOS / KJI framework** to analyse
         epistemic diversity and justice across gender and geography.
         """
     )
 
-    # ---------------- Sidebar: data input ----------------
+    # --------------- Sidebar: data input ----------------
     st.sidebar.header("1. Data input")
     use_demo = st.sidebar.checkbox("Use demo_scopus.csv from data/", value=True)
     uploaded = st.sidebar.file_uploader(
@@ -542,13 +588,12 @@ def main():
         st.info("Upload a CSV file or enable the demo dataset to start.")
         return
 
-    # Robust CSV reader
     df = read_scopus_csv(uploaded)
 
     st.subheader("Raw data (first 5 rows)")
     st.dataframe(df.head(), use_container_width=True)
 
-    # ---------------- Sidebar: parameters ----------------
+    # --------------- Sidebar: parameters ----------------
     st.sidebar.header("2. Columns and parameters")
     author_col = st.sidebar.text_input("Author column", "Author full names")
     country_col = st.sidebar.text_input("Country column", "Country")
@@ -556,10 +601,13 @@ def main():
 
     lambda_entropy = st.sidebar.slider(
         "λ (weight of entropy in KCDI)",
-        0.0, 1.0, 0.5, 0.05,
+        0.0,
+        1.0,
+        0.5,
+        0.05,
     )
 
-    # ---------------- Data enrichment ----------------
+    # --------------- Data enrichment ----------------
     df = ensure_country_column(df, country_col=country_col)
     df = add_gender_column(df, author_col=author_col, new_col="gender")
     df = add_region_column(df, country_col=country_col, new_col="region")
@@ -571,9 +619,15 @@ def main():
     ]
     st.dataframe(df[cols_show].head(), use_container_width=True)
 
-    # ---------------- Tabs ----------------
+    # --------------- Tabs ----------------
     tab_kcdi, tab_kji, tab_trends, tab_authors, tab_notes = st.tabs(
-        ["KCDI", "KJI / KRATOS", "Trends", "Author / Institution explorer", "Methodological notes"]
+        [
+            "KCDI",
+            "KJI / KRATOS",
+            "Trends",
+            "Author / Institution explorer",
+            "Methodological notes",
+        ]
     )
 
     # --- Tab: KCDI ---
@@ -605,48 +659,56 @@ def main():
         st.dataframe(kratos_table, use_container_width=True)
         plot_kji_bar(kratos_table)
 
-    st.markdown("#### Justice quadrant: KCDI vs KJI")
+        st.markdown("#### Justice quadrant: KCDI vs KJI")
+        if not kratos_table.empty:
+            kt = kratos_table.copy()
+            kt["group"] = (
+                kt["gender"].astype(str) + " – " + kt["region"].astype(str)
+            )
 
-if not kratos_table.empty:
-    kt = kratos_table.copy()
-    kt["group"] = kt["gender"].astype(str) + " – " + kt["region"].astype(str)
+            fig = px.scatter(
+                kt,
+                x="KCDI",
+                y="KJI",
+                size="n_docs",
+                color="region",
+                hover_data=["gender", "region", "n_docs", "A_factor", "S_factor"],
+            )
+            fig.update_layout(
+                xaxis_title="KCDI (Epistemic diversity)",
+                yaxis_title="KJI (Knowledge justice)",
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-    fig = px.scatter(
-        kt,
-        x="KCDI",
-        y="KJI",
-        size="n_docs",
-        color="region",
-        hover_data=["gender", "region", "n_docs", "A_factor", "S_factor"],
-    )
-    fig.update_layout(
-        xaxis_title="KCDI (Epistemic diversity)",
-        yaxis_title="KJI (Knowledge justice)",
-    )
-    st.plotly_chart(fig, use_container_width=True)
+            st.markdown("#### KRATOS components by group")
+            kratos_table["group"] = (
+                kratos_table["gender"] + " – " + kratos_table["region"]
+            )
+            selected = st.selectbox(
+                "Select group",
+                kratos_table["group"].unique(),
+            )
 
-    st.markdown("#### KRATOS components by group")
+            row = kratos_table[kratos_table["group"] == selected].iloc[0]
+            radar_df = pd.DataFrame(
+                {
+                    "component": ["KCDI", "A_factor", "S_factor"],
+                    "value": [row["KCDI"], row["A_factor"], row["S_factor"]],
+                }
+            )
 
-if not kratos_table.empty:
-    kratos_table["group"] = kratos_table["gender"] + " – " + kratos_table["region"]
-    selected = st.selectbox("Select group", kratos_table["group"].unique())
+            fig = px.line_polar(
+                radar_df,
+                r="value",
+                theta="component",
+                line_close=True,
+            )
+            fig.update_traces(fill="toself")
+            fig.update_layout(polar=dict(radialaxis=dict(range=[0, 1])))
+            st.plotly_chart(fig, use_container_width=True)
 
-    row = kratos_table[kratos_table["group"] == selected].iloc[0]
-    radar_df = pd.DataFrame({
-        "component": ["KCDI", "A_factor", "S_factor"],
-        "value": [row["KCDI"], row["A_factor"], row["S_factor"]],
-    })
-
-    fig = px.line_polar(
-        radar_df,
-        r="value",
-        theta="component",
-        line_close=True,
-    )
-    fig.update_traces(fill="toself")
-    fig.update_layout(polar=dict(radialaxis=dict(range=[0, 1])))
-    st.plotly_chart(fig, use_container_width=True)
-
+            st.markdown("#### Heatmap of KJI by gender and region")
+            plot_kji_heatmap(kratos_table)
 
     # --- Tab: Trends ---
     with tab_trends:
@@ -654,59 +716,8 @@ if not kratos_table.empty:
         st.markdown("Share of documents by gender across years.")
         plot_gender_trend(df)
 
-def plot_gender_trend_stacked(df: pd.DataFrame):
-    if "Year" not in df.columns:
-        st.info("No 'Year' column found; cannot compute temporal trends.")
-        return
-
-    d = df.copy()
-    d["Year"] = pd.to_numeric(d["Year"], errors="coerce")
-    d = d.dropna(subset=["Year"])
-    if d.empty:
-        st.info("Year values are missing or invalid; cannot compute trends.")
-        return
-
-    d["Year"] = d["Year"].astype(int)
-
-    g = (
-        d.groupby(["Year", "gender"])
-         .size()
-         .reset_index(name="n_docs")
-    )
-    g["total_year"] = g.groupby("Year")["n_docs"].transform("sum")
-    g["share"] = g["n_docs"] / g["total_year"]
-
-    fig = px.area(
-        g,
-        x="Year",
-        y="share",
-        color="gender",
-        groupnorm="fraction",
-    )
-    fig.update_layout(
-        xaxis_title="Year",
-        yaxis_title="Share of documents (stacked)",
-        yaxis_tickformat=".0%",
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-def plot_kji_heatmap(kratos_table: pd.DataFrame):
-    if kratos_table.empty:
-        st.info("No KJI data for heatmap.")
-        return
-    pivot = kratos_table.pivot_table(
-        index="gender", columns="region", values="KJI", aggfunc="mean"
-    )
-
-    fig = px.imshow(
-        pivot,
-        text_auto=".3f",
-        aspect="auto",
-        labels=dict(x="Region", y="Gender", color="KJI"),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-st.markdown("#### Heatmap of KJI by gender and region")
-plot_kji_heatmap(kratos_table)
+        st.markdown("#### Stacked composition by gender")
+        plot_gender_trend_stacked(df)
 
     # --- Tab: Author / Institution explorer ---
     with tab_authors:
@@ -734,9 +745,19 @@ plot_kji_heatmap(kratos_table)
         if search:
             s = search.lower()
             mask = False
-            for col in ["Authors", "Author full names", "Affiliations", "Author(s) ID"]:
+            for col in [
+                "Authors",
+                "Author full names",
+                "Affiliations",
+                "Author(s) ID",
+            ]:
                 if col in df_show.columns:
-                    m_col = df_show[col].astype(str).str.lower().str.contains(s)
+                    m_col = (
+                        df_show[col]
+                        .astype(str)
+                        .str.lower()
+                        .str.contains(s)
+                    )
                     mask = m_col if isinstance(mask, bool) else (mask | m_col)
             if not isinstance(mask, bool):
                 df_show = df_show[mask]
@@ -744,25 +765,23 @@ plot_kji_heatmap(kratos_table)
         st.dataframe(df_show.head(500), use_container_width=True)
         st.caption("Showing up to 500 rows (filtered).")
 
-def summarise_authors(df: pd.DataFrame, author_col: str, citations_col: str):
-    d = df.copy()
-    if author_col not in d.columns:
-        return pd.DataFrame()
-
-    if citations_col not in d.columns:
-        d[citations_col] = 1
-
-    g = (
-        d.groupby(author_col)
-         .agg(
-             total_cites=(citations_col, "sum"),
-             n_docs=("Year", "count"),
-             gender_mode=("gender", lambda x: x.mode().iat[0] if not x.mode().empty else "unknown"),
-             region_mode=("region", lambda x: x.mode().iat[0] if not x.mode().empty else "Unknown"),
-         )
-         .reset_index()
-    )
-    return g
+        st.markdown("#### Top 20 authors by citations")
+        author_summary = summarise_authors(
+            df, author_col=author_col, citations_col=citations_col
+        )
+        if not author_summary.empty:
+            top = author_summary.sort_values(
+                "total_cites", ascending=False
+            ).head(20)
+            fig = px.bar(
+                top,
+                x=author_col,
+                y="total_cites",
+                color="gender_mode",
+                hover_data=["region_mode", "n_docs"],
+            )
+            fig.update_layout(xaxis_tickangle=-60, margin=dict(b=160))
+            st.plotly_chart(fig, use_container_width=True)
 
     # --- Tab: Methodological notes ---
     with tab_notes:
@@ -777,5 +796,7 @@ def summarise_authors(df: pd.DataFrame, author_col: str, citations_col: str):
             - Groups are defined here as intersections of gender and region.
             """
         )
+
+
 if __name__ == "__main__":
     main()
