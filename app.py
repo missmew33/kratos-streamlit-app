@@ -654,7 +654,7 @@ if not kratos_table.empty:
         st.markdown("Share of documents by gender across years.")
         plot_gender_trend(df)
 
-    def plot_gender_trend_stacked(df: pd.DataFrame):
+def plot_gender_trend_stacked(df: pd.DataFrame):
     if "Year" not in df.columns:
         st.info("No 'Year' column found; cannot compute temporal trends.")
         return
