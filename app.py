@@ -566,7 +566,10 @@ def main():
     cols_show = [c for c in [author_col, "gender", country_col, "region"] if c in df.columns]
     st.dataframe(df[cols_show].head(), use_container_width=True)
 
-    tab_kcdi, tab_kji, tab_notes = st.tabs(["KCDI", "KJI / KRATOS", "Methodological notes"])
+tab_kcdi, tab_kji, tab_trends, tab_authors, tab_notes = st.tabs(
+    ["KCDI", "KJI / KRATOS", "Trends", "Author / Institution explorer", "Methodological notes"]
+)
+
 
     with tab_kcdi:
         st.markdown("### KCDI by gender and region")
@@ -578,6 +581,9 @@ def main():
         )
         st.dataframe(kcdi_table, use_container_width=True)
         plot_kcdi_bar(kcdi_table)
+                st.markdown("#### Share of documents by gender–region")
+        plot_group_share(df, gender_col="gender", region_col="region")
+
 
     with tab_kji:
         st.markdown("### KJI – Knowledge Justice Index")
@@ -589,6 +595,10 @@ def main():
         )
         st.dataframe(kratos_table, use_container_width=True)
         plot_kji_bar(kratos_table)
+    with tab_trends:
+        st.markdown("### Temporal trends")
+        st.markdown("Share of documents by gender across years.")
+        plot_gender_trend(df)
 
     with tab_notes:
         st.markdown(
@@ -606,3 +616,39 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    with tab_authors:
+        st.markdown("### Author / Institution explorer")
+
+        search = st.text_input(
+            "Filter by author name, institution or ID (partial match)",
+            "",
+        )
+
+        # Columns to show if available
+        cols_interest = [
+            "Authors",
+            "Author full names",
+            "Author(s) ID",
+            "Affiliations",
+            "gender",
+            "region",
+            "Cited by",
+            "Year",
+            "Source title",
+        ]
+        cols_available = [c for c in cols_interest if c in df.columns]
+        df_show = df[cols_available].copy()
+
+        if search:
+            s = search.lower()
+            mask = False
+            for col in ["Authors", "Author full names", "Affiliations", "Author(s) ID"]:
+                if col in df_show.columns:
+                    m_col = df_show[col].astype(str).str.lower().str.contains(s)
+                    mask = m_col if isinstance(mask, bool) else (mask | m_col)
+            if not isinstance(mask, bool):
+                df_show = df_show[mask]
+
+        st.dataframe(df_show.head(500), use_container_width=True)
+        st.caption("Showing up to 500 rows (filtered).")
