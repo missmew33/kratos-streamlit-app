@@ -406,9 +406,17 @@ def plot_kcdi_bar(df: pd.DataFrame, gender_col="gender", region_col="region"):
         st.info("No KCDI data to plot.")
         return
     df = df.copy()
-    df["group"] = df[gender_col] + " – " + df[region_col]
-    fig = px.bar(df, x="group", y="KCDI")
-    fig.update_layout(xaxis_title="Group", yaxis_title="KCDI")
+    df["group"] = df[gender_col].astype(str) + " – " + df[region_col].astype(str)
+    df = df.sort_values("KCDI", ascending=False)
+
+    fig = px.bar(df, x="group", y="KCDI", text="KCDI")
+    fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+    fig.update_layout(
+        xaxis_title="Group (gender – region)",
+        yaxis_title="KCDI",
+        xaxis_tickangle=-45,
+        margin=dict(b=120),
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -417,11 +425,94 @@ def plot_kji_bar(df: pd.DataFrame, gender_col="gender", region_col="region"):
         st.info("No KJI data to plot.")
         return
     df = df.copy()
-    df["group"] = df[gender_col] + " – " + df[region_col]
-    fig = px.bar(df, x="group", y="KJI")
-    fig.update_layout(xaxis_title="Group", yaxis_title="KJI (Knowledge Justice Index)")
+    df["group"] = df[gender_col].astype(str) + " – " + df[region_col].astype(str)
+    df = df.sort_values("KJI", ascending=False)
+
+    fig = px.bar(df, x="group", y="KJI", text="KJI")
+    fig.update_traces(texttemplate="%{text:.3f}", textposition="outside")
+    fig.update_layout(
+        xaxis_title="Group (gender – region)",
+        yaxis_title="KJI (Knowledge Justice Index)",
+        xaxis_tickangle=-45,
+        margin=dict(b=120),
+    )
     st.plotly_chart(fig, use_container_width=True)
 
+def plot_group_share(df: pd.DataFrame,
+                     gender_col: str = "gender",
+                     region_col: str = "region"):
+    """
+    Show how many documents belong to each gender–region group (counts + share).
+    """
+    if df.empty:
+        st.info("No data to plot.")
+        return
+
+    g = (
+        df.groupby([gender_col, region_col])
+          .size()
+          .reset_index(name="n_docs")
+    )
+    total = g["n_docs"].sum()
+    if total == 0:
+        st.info("No documents found for group share plot.")
+        return
+
+    g["share"] = g["n_docs"] / total
+    g["group"] = g[gender_col].astype(str) + " – " + g[region_col].astype(str)
+    g = g.sort_values("share", ascending=False)
+
+    fig = px.bar(g, x="group", y="share", text="n_docs")
+    fig.update_traces(texttemplate="%{text} docs", textposition="outside")
+    fig.update_layout(
+        xaxis_title="Group (gender – region)",
+        yaxis_title="Share of documents",
+        xaxis_tickangle=-45,
+        yaxis_tickformat=".0%",
+        margin=dict(b=120),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def plot_gender_trend(df: pd.DataFrame):
+    """
+    Trend: share of documents by gender across years.
+    Requires a 'Year' column.
+    """
+    if "Year" not in df.columns:
+        st.info("No 'Year' column found; cannot compute temporal trends.")
+        return
+
+    d = df.copy()
+    d["Year"] = pd.to_numeric(d["Year"], errors="coerce")
+    d = d.dropna(subset=["Year"])
+    if d.empty:
+        st.info("Year values are missing or invalid; cannot compute trends.")
+        return
+
+    d["Year"] = d["Year"].astype(int)
+
+    g = (
+        d.groupby(["Year", "gender"])
+         .size()
+         .reset_index(name="n_docs")
+    )
+    g["total_year"] = g.groupby("Year")["n_docs"].transform("sum")
+    g["share"] = g["n_docs"] / g["total_year"]
+
+    fig = px.line(
+        g,
+        x="Year",
+        y="share",
+        color="gender",
+        markers=True,
+    )
+    fig.update_layout(
+        xaxis_title="Year",
+        yaxis_title="Share of documents",
+        yaxis_tickformat=".0%",
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------
 # Streamlit layout
