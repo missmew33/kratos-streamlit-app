@@ -690,7 +690,7 @@ def plot_gender_trend_stacked(df: pd.DataFrame):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    def plot_kji_heatmap(kratos_table: pd.DataFrame):
+def plot_kji_heatmap(kratos_table: pd.DataFrame):
     if kratos_table.empty:
         st.info("No KJI data for heatmap.")
         return
