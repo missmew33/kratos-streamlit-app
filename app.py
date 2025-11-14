@@ -605,11 +605,108 @@ def main():
         st.dataframe(kratos_table, use_container_width=True)
         plot_kji_bar(kratos_table)
 
+    st.markdown("#### Justice quadrant: KCDI vs KJI")
+
+if not kratos_table.empty:
+    kt = kratos_table.copy()
+    kt["group"] = kt["gender"].astype(str) + " – " + kt["region"].astype(str)
+
+    fig = px.scatter(
+        kt,
+        x="KCDI",
+        y="KJI",
+        size="n_docs",
+        color="region",
+        hover_data=["gender", "region", "n_docs", "A_factor", "S_factor"],
+    )
+    fig.update_layout(
+        xaxis_title="KCDI (Epistemic diversity)",
+        yaxis_title="KJI (Knowledge justice)",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("#### KRATOS components by group")
+
+if not kratos_table.empty:
+    kratos_table["group"] = kratos_table["gender"] + " – " + kratos_table["region"]
+    selected = st.selectbox("Select group", kratos_table["group"].unique())
+
+    row = kratos_table[kratos_table["group"] == selected].iloc[0]
+    radar_df = pd.DataFrame({
+        "component": ["KCDI", "A_factor", "S_factor"],
+        "value": [row["KCDI"], row["A_factor"], row["S_factor"]],
+    })
+
+    fig = px.line_polar(
+        radar_df,
+        r="value",
+        theta="component",
+        line_close=True,
+    )
+    fig.update_traces(fill="toself")
+    fig.update_layout(polar=dict(radialaxis=dict(range=[0, 1])))
+    st.plotly_chart(fig, use_container_width=True)
+
+
     # --- Tab: Trends ---
     with tab_trends:
         st.markdown("### Temporal trends")
         st.markdown("Share of documents by gender across years.")
         plot_gender_trend(df)
+
+    def plot_gender_trend_stacked(df: pd.DataFrame):
+    if "Year" not in df.columns:
+        st.info("No 'Year' column found; cannot compute temporal trends.")
+        return
+
+    d = df.copy()
+    d["Year"] = pd.to_numeric(d["Year"], errors="coerce")
+    d = d.dropna(subset=["Year"])
+    if d.empty:
+        st.info("Year values are missing or invalid; cannot compute trends.")
+        return
+
+    d["Year"] = d["Year"].astype(int)
+
+    g = (
+        d.groupby(["Year", "gender"])
+         .size()
+         .reset_index(name="n_docs")
+    )
+    g["total_year"] = g.groupby("Year")["n_docs"].transform("sum")
+    g["share"] = g["n_docs"] / g["total_year"]
+
+    fig = px.area(
+        g,
+        x="Year",
+        y="share",
+        color="gender",
+        groupnorm="fraction",
+    )
+    fig.update_layout(
+        xaxis_title="Year",
+        yaxis_title="Share of documents (stacked)",
+        yaxis_tickformat=".0%",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    def plot_kji_heatmap(kratos_table: pd.DataFrame):
+    if kratos_table.empty:
+        st.info("No KJI data for heatmap.")
+        return
+    pivot = kratos_table.pivot_table(
+        index="gender", columns="region", values="KJI", aggfunc="mean"
+    )
+
+    fig = px.imshow(
+        pivot,
+        text_auto=".3f",
+        aspect="auto",
+        labels=dict(x="Region", y="Gender", color="KJI"),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+st.markdown("#### Heatmap of KJI by gender and region")
+plot_kji_heatmap(kratos_table)
 
     # --- Tab: Author / Institution explorer ---
     with tab_authors:
@@ -646,6 +743,26 @@ def main():
 
         st.dataframe(df_show.head(500), use_container_width=True)
         st.caption("Showing up to 500 rows (filtered).")
+
+def summarise_authors(df: pd.DataFrame, author_col: str, citations_col: str):
+    d = df.copy()
+    if author_col not in d.columns:
+        return pd.DataFrame()
+
+    if citations_col not in d.columns:
+        d[citations_col] = 1
+
+    g = (
+        d.groupby(author_col)
+         .agg(
+             total_cites=(citations_col, "sum"),
+             n_docs=("Year", "count"),
+             gender_mode=("gender", lambda x: x.mode().iat[0] if not x.mode().empty else "unknown"),
+             region_mode=("region", lambda x: x.mode().iat[0] if not x.mode().empty else "Unknown"),
+         )
+         .reset_index()
+    )
+    return g
 
     # --- Tab: Methodological notes ---
     with tab_notes:
