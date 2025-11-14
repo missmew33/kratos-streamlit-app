@@ -44,6 +44,50 @@ def read_scopus_csv(file_obj) -> pd.DataFrame:
         on_bad_lines="skip"
     )
 
+def extract_first_author_given_name(raw: str) -> str:
+    """
+    Extract the given name of the first author from a Scopus-style
+    'Authors' or 'Author full names' field.
+
+    Examples of inputs:
+    - "Bao, Guotai"
+    - "Divya; M., Narwal, Mahabir"
+    - "Jog, Deepti; N.A., Alcasoas, Nelissa Andrea"
+    """
+    if pd.isna(raw) or not isinstance(raw, str):
+        return ""
+
+    s = raw.strip()
+
+    # Some Scopus exports include line breaks; keep only the first line
+    s = s.splitlines()[0]
+
+    # 1) Take the first author (authors separated by ';')
+    first_author = s.split(";")[0].strip()
+
+    # 2) Scopus pattern is usually "Surname, Given names"
+    if "," in first_author:
+        parts = first_author.split(",", 1)
+        given_part = parts[1].strip()
+    else:
+        given_part = first_author
+
+    # 3) Remove IDs, parentheses, numbers
+    given_part = re.sub(r"\(.*?\)", "", given_part)
+    given_part = re.sub(r"\d", "", given_part)
+
+    # 4) Split into tokens, remove punctuation, keep tokens with ≥2 letters
+    tokens = given_part.replace("-", " ").split()
+    clean_tokens = [
+        re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ]", "", t) for t in tokens
+    ]
+    clean_tokens = [t for t in clean_tokens if len(t) >= 2]
+
+    if not clean_tokens:
+        return ""
+
+    # Often the last token is the actual given name ("Mahabir", "Deepti")
+    return clean_tokens[-1]
 
 # ------------------------------------------------------------
 # Helpers
