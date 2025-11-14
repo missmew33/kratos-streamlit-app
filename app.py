@@ -709,7 +709,7 @@ st.markdown("#### Heatmap of KJI by gender and region")
 plot_kji_heatmap(kratos_table)
 
     # --- Tab: Author / Institution explorer ---
-        with tab_authors:
+    with tab_authors:
         st.markdown("### Author / Institution explorer")
 
         search = st.text_input(
