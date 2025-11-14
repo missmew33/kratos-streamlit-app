@@ -17,6 +17,32 @@ st.set_page_config(
     layout="wide"
 )
 
+def read_scopus_csv(file_obj) -> pd.DataFrame:
+    """
+    Robust reader for Scopus-style CSV files.
+    Tries comma-separated first; if it fails, tries semicolon.
+    Skips badly formatted lines instead of raising a ParserError.
+    """
+    # First attempt: comma-separated
+    try:
+        file_obj.seek(0)
+        return pd.read_csv(
+            file_obj,
+            engine="python",
+            on_bad_lines="skip"
+        )
+    except Exception:
+        pass
+
+    # Second attempt: semicolon-separated
+    file_obj.seek(0)
+    return pd.read_csv(
+        file_obj,
+        sep=";",
+        engine="python",
+        on_bad_lines="skip"
+    )
+
 
 # ------------------------------------------------------------
 # Helpers
