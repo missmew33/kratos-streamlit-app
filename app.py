@@ -100,18 +100,59 @@ def load_demo_file() -> io.BytesIO | None:
     return None
 
 
+def extract_first_author_given_name(raw: str) -> str:
+    """
+    Extract the given name of the first author from a Scopus-style
+    'Authors' or 'Author full names' field.
+
+    Examples:
+    - "Bao, Guotai"
+    - "Divya; M., Narwal, Mahabir"
+    - "Jog, Deepti; N.A., Alcasoas, Nelissa Andrea"
+    """
+    if pd.isna(raw) or not isinstance(raw, str):
+        return ""
+
+    s = str(raw).strip()
+    # Some Scopus exports include line breaks; keep only the first line
+    s = s.splitlines()[0]
+
+    # 1) First author (authors separated by ';')
+    first_author = s.split(";")[0].strip()
+
+    # 2) Usually "Surname, Given names"
+    if "," in first_author:
+        parts = first_author.split(",", 1)
+        given_part = parts[1].strip()
+    else:
+        given_part = first_author
+
+    # 3) Remove IDs, parentheses, digits
+    given_part = re.sub(r"\(.*?\)", "", given_part)
+    given_part = re.sub(r"\d", "", given_part)
+
+    # 4) Clean tokens, keep those with ≥2 letters
+    tokens = given_part.replace("-", " ").split()
+    clean_tokens = [re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ]", "", t) for t in tokens]
+    clean_tokens = [t for t in clean_tokens if len(t) >= 2]
+
+    if not clean_tokens:
+        return ""
+
+    # Often the last token is the actual given name
+    return clean_tokens[-1]
+
+
 def _infer_gender(detector: gender.Detector, author: str) -> str:
     """
     Infer gender from the first author's given name using gender-guesser.
-    'andy' (and ambiguous cases) are mapped to 'unknown'.
+    Ambiguous ('andy') is mapped to 'unknown'.
     """
     given_name = extract_first_author_given_name(author)
     if not given_name:
         return "unknown"
 
     g = detector.get_gender(given_name)
-
-    # Map ambiguous to unknown
     if g == "andy":
         return "unknown"
     return g
@@ -122,20 +163,25 @@ def add_gender_column(df: pd.DataFrame,
                       new_col: str = "gender") -> pd.DataFrame:
     det = gender.Detector(case_sensitive=False)
     df = df.copy()
+
     if author_col not in df.columns:
         st.warning(f"Column '{author_col}' not found. Gender set to 'unknown'.")
         df[new_col] = "unknown"
         return df
-df[new_col] = df[author_col].astype(str).apply(lambda x: _infer_gender(det, x))
 
-# Collapse 'mostly_female' and 'mostly_male' into binary categories
-mapping = {
-    "mostly_female": "female",
-    "mostly_male": "male",
-}
-df[new_col] = df[new_col].replace(mapping)
+    # Infer gender for each row
+    df[new_col] = df[author_col].astype(str).apply(
+        lambda x: _infer_gender(det, x)
+    )
 
-return df
+    # Collapse 'mostly_female'/'mostly_male' into female/male
+    mapping = {
+        "mostly_female": "female",
+        "mostly_male": "male",
+    }
+    df[new_col] = df[new_col].replace(mapping)
+
+    return df
 
 
 def extract_country_from_affiliation(s: str) -> str:
