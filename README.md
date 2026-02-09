@@ -1,55 +1,93 @@
-# kcdi-streamlit-app
+# KCDI Streamlit App — Knowledge Justice Analytics for Scopus Data
 
-Web application for analysing the **Knowledge Contribution Diversity Index (KCDI)** from Scopus data.  
-Built with Python and Streamlit.
+An interactive web application that turns Scopus-exported metadata into **epistemic diversity and justice diagnostics** using the **Knowledge Contribution Diversity Index (KCDI)**.  
+Built in **Python** and delivered as a **Streamlit** web app so the full analytical pipeline can be executed, inspected, and replicated without running scripts manually.
 
-## KCDI App for Epistemic Justice Analysis
+---
 
-### Description
+## What this app is (as a research instrument)
 
-This interactive web app computes the **Knowledge Contribution Diversity Index (KCDI)** to assess
-epistemic justice in scholarly production. It allows users to upload a Scopus file (`.csv` or `.xlsx`)
-and visualise diversity patterns in terms of gender and geography.
+This app is not only a calculator. It is a **computational research instrument** that operationalises KCDI as a structured pipeline:
 
-### Main features
+1. **Data input** (Scopus export upload)
+2. **Column selection and parameterisation** (explicit analytical choices)
+3. **Data enrichment** (gender-coded proxy + country/region classification)
+4. **Metric computation** (KCDI and supporting components)
+5. **Diagnostic visual analytics** (tables + plots for interpretability)
+6. **Export for audit and reproducibility**
 
-- **KCDI analysis**: calculates KCDI, Shannon index and weighting factors.
-- **Visualisations**: generates a KCDI compass chart and an intersectional bar chart.
-- **Data processing**: cleans and preprocesses Scopus exports, infers gender, and classifies
-  authors into Global North / Global South based on country information.
-- **Data export**: allows downloading the processed dataset for further analysis.
+The interface is designed so that key assumptions (e.g., grouping variables, weights, proxies, and parameters) are **visible**, which is essential for interpretability and for comparing results across different corpora.
 
-### How to use
+---
 
-1. Upload a `.csv` or `.xlsx` file exported from Scopus.
-2. The file must contain at least the columns `Authors` and `Country`.
-3. The app will process the data and display the KCDI metrics and plots.
+## What the app does
 
-### Deployment
+### 1) Data input
+- Upload a Scopus-style dataset in `.csv` or `.xlsx`
+- Preview the dataset immediately to verify correct parsing (first rows)
 
-The app is deployed on **Streamlit Community Cloud**.  
-You can also run it locally with:
+### 2) Columns and parameters
+- Select or confirm which columns correspond to:
+  - authors
+  - country (or affiliation-derived country)
+  - year (optional but recommended)
+  - citations / impact proxy (optional; used for weighting if available)
+- Set key parameters (when enabled in the current version), such as the blending parameter used in the KCDI formulation.
+
+### 3) Enriched dataset (auditable)
+The app generates an enriched analytical dataset including:
+- author name extraction (for proxy coding)
+- **gender-coded labels** (proxy inference when not provided by the source)
+- country normalisation and mapping
+- **region classification** (e.g., Global North / Global South proxy)
+
+A preview of the enriched table is shown to support auditing before interpreting results.
+
+### 4) KCDI metrics
+The app computes:
+- **KCDI** by selected grouping variables (e.g., gender, region, or intersection)
+- supporting components required for interpretability (e.g., diversity and weighting terms, group sizes)
+
+### 5) Visual diagnostics
+Interactive plots help interpret structural patterns and compare groups, including:
+- group-level KCDI comparisons
+- intersectional comparisons (e.g., gender × region)
+- (when available) time-based summaries
+
+### 6) Export
+- Download the enriched dataset and/or summary outputs for independent verification or extended analysis.
+
+---
+
+## Input requirements
+
+Minimum required fields:
+- `Authors` (or equivalent author-name field)
+- `Country` (or a field from which country can be derived)
+
+Recommended fields:
+- `Year` (enables temporal diagnostics)
+- `Cited by` (enables citation-weighted variants where applicable)
+
+---
+
+## How to use
+
+1. Upload a Scopus-exported `.csv` or `.xlsx` file.
+2. Confirm/select the correct columns under **Columns and parameters**.
+3. Inspect the **Raw data** preview (parsing check).
+4. Inspect the **Enriched data** preview (enrichment check).
+5. Read KCDI outputs and plots; export results if needed.
+
+---
+
+## Deployment
+
+The app runs on **Streamlit Community Cloud** and can also be executed locally.
+
+### Run locally
 
 ```bash
 pip install -r requirements.txt
-streamlit run kcdi_app.py
+streamlit run app.py
 
-### Dependencies
-
-All required Python packages are listed in requirements.txt.
-
-
-5. Write a commit message, e.g. `Translate README to English`.
-6. Click **“Commit changes”**.
-
-### 2. Verify the KRATOS app
-
-For the new KRATOS app (`kratoskcdi.streamlit.app`):
-
-- Repository must be `missmew33/kratos-streamlit-app`.
-- Main file must be `app.py`.
-- When you open it, the title should be, in English:  
-  “KRATOS – Knowledge Justice Analytics for Scholarly Data”.
-
-If that is what you see, then the KRATOS app is already fully in English; only the old KCDI repo README needed translation.
-::contentReference[oaicite:0]{index=0}
