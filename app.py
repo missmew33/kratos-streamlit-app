@@ -403,59 +403,67 @@ def compute_pleonasm(
     return pd.DataFrame(rows)
 
 
-# ------------------------------------------------------------
-# Author summary
-# ------------------------------------------------------------
-def summarise_authors(df: pd.DataFrame, author_col: str, citations_col: str):
-    """Aggregate at author level: docs, citations, modal gender/region."""
-    d = df.copy()
-    if author_col not in d.columns:
+def summarise_authors(
+    df: pd.DataFrame,
+    author_col: str = "Author full names",
+    citations_col: str | None = None,
+) -> pd.DataFrame:
+    """
+    Aggregate documents by first author, compute:
+    - number of docs
+    - total citations
+    - modal gender
+    - modal region
+    """
+    data = df.copy()
+
+    if author_col not in data.columns:
+        st.warning(f"Column '{author_col}' not found. Cannot summarise authors.")
         return pd.DataFrame()
 
-    if citations_col not in d.columns:
-        d[citations_col] = 1.0
+    rows = []
+    for author, sub in data.groupby(author_col):
+        total_cites = 0.0
+        if citations_col and citations_col in sub.columns:
+            total_cites = float(to_numeric_weight(sub[citations_col]).sum())
 
-    d[citations_col] = to_numeric_weight(d[citations_col])
+        gender_mode = sub["gender"].mode().iloc[0] if "gender" in sub.columns and not sub["gender"].mode().empty else "unknown"
+        region_mode = sub["region"].mode().iloc[0] if "region" in sub.columns and not sub["region"].mode().empty else "Unknown"
 
-    g = (
-        d.groupby(author_col)
-        .agg(
-            total_cites=(citations_col, "sum"),
-            n_docs=("Year", "count") if "Year" in d.columns else (citations_col, "count"),
-            gender_mode=(
-                "gender",
-                lambda x: x.mode().iat[0] if not x.mode().empty else "unknown",
-            ),
-            region_mode=(
-                "region",
-                lambda x: x.mode().iat[0] if not x.mode().empty else "Unknown",
-            ),
+        rows.append(
+            {
+                author_col: author,
+                "n_docs": len(sub),
+                "total_cites": total_cites,
+                "gender_mode": gender_mode,
+                "region_mode": region_mode,
+            }
         )
-        .reset_index()
-    )
-    return g
+
+    return pd.DataFrame(rows)
 
 
 # ------------------------------------------------------------
-# Main app
+# Main
 # ------------------------------------------------------------
 def main():
-    st.title("KRATOS – Knowledge Justice Analytics for Scholarly Data")
-    st.markdown(
-        """
-        This app implements **KRATOS / KJI** to analyse epistemic diversity and justice across **gender-coded proxies**
-        and **geographical position** (e.g., Global North/South proxy). The interface is designed to make key parameters
-        and intermediate outputs auditable prior to interpretation.
-        """
-    )
+    st.title("KRATOS – Knowledge Justice Analytics")
 
-    # ---------------- Sidebar: data input ----------------
-    st.sidebar.header("1. Data input")
-    use_demo = st.sidebar.checkbox("Use demo_scopus.csv from data/", value=True)
-    uploaded = st.sidebar.file_uploader("Upload a Scopus-style CSV file", type=["csv"])
+    # ---------------- Sidebar: file upload ----------------
+    st.sidebar.header("1. Upload or demo")
+    upload = st.sidebar.file_uploader("Upload Scopus CSV", type=["csv"])
 
-    if use_demo and uploaded is None:
-        uploaded = load_demo_file()
+    demo_enable = st.sidebar.checkbox("Use demo data")
+
+    uploaded = None
+    if upload:
+        uploaded = upload
+    elif demo_enable:
+        demo = load_demo_file()
+        if demo:
+            uploaded = demo
+        else:
+            st.warning("Demo file not found. Place 'data/demo_scopus.csv' in your repo.")
 
     if uploaded is None:
         st.info("Upload a CSV file or enable the demo dataset to start.")
@@ -559,7 +567,10 @@ def main():
         st.dataframe(ppi_table, use_container_width=True)
 
         if not ppi_table.empty and not kji_table.empty:
-            merged = ppi_table.merge(
+            # CORRECCIÓN: Eliminar n_docs de ppi_table antes del merge para evitar conflicto
+            ppi_for_merge = ppi_table.drop(columns=["n_docs"])
+            
+            merged = ppi_for_merge.merge(
                 kji_table[["gender", "region", "S_factor", "KJI", "KCDI", "n_docs"]],
                 on=["gender", "region"],
                 how="left",
@@ -569,7 +580,7 @@ def main():
                 merged,
                 x="PPI_HHI",
                 y="S_factor",
-                size="n_docs",
+                size="n_docs",  # Ahora n_docs viene solo de kji_table
                 color="region",
                 hover_data=["gender", "region", "Top10_share", "Top05_share", "KJI", "KCDI"],
                 title="Diagnostic: Pleonasm (HHI concentration) vs Recognition fairness (S)",
