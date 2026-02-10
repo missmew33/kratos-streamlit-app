@@ -18,15 +18,19 @@ st.set_page_config(
     layout="wide"
 )
 
-# >>> PASTE THE BLOCK HERE <<<
+# >>> BLOQUE CORREGIDO <<<
 ASSETS_DIR = Path(__file__).parent / "assets"
 HERO_IMAGE = ASSETS_DIR / "kratos_front.png"
-if HERO_IMAGE.exists():
-    st.image(str(HERO_IMAGE), use_container_width=True)
-else:
-    st.caption("Front image not found: add /assets/kratos_front.png to the repository.")
-# <<< END BLOCK >>>
 
+if HERO_IMAGE.exists():
+    # Intentamos el parámetro nuevo, si falla usamos el antiguo
+    try:
+        st.image(str(HERO_IMAGE), use_container_width=True)
+    except TypeError:
+        st.image(str(HERO_IMAGE), use_column_width=True)
+else:
+    st.info("💡 Tip: Para ver la imagen de portada, añade 'assets/kratos_front.png' a tu repositorio.")
+# <<< END BLOCK >>>
 
 # ------------------------------------------------------------
 # Data loading
