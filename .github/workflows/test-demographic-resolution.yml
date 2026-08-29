@@ -25,4 +25,6 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q app.py app_v2_2.py kratos_core.py scripts tests
       - name: Run tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: pytest -q
