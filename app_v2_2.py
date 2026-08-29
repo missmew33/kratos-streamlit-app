@@ -145,9 +145,11 @@ def compute_group_justice_metrics_v2(
     weight_col: str,
     kcdi_corpus: float,
 ):
-    # kcdi_corpus is accepted for compatibility; the fixed-G core recomputes it
-    # from the dataframe so one source of truth governs all reported quantities.
+    # A(u) and S(u) do not depend on lambda. We derive those factors once from
+    # the fixed-G core, then rescale group KJI with the KCDI supplied by the UI
+    # so the selected lambda is respected consistently.
     groups, _ = compute_kratos_fixed_g(df, group_col, weight_col, 0.5)
+    groups["KJI_group"] = kcdi_corpus * groups["A_factor"] * groups["S_factor"]
     groups["abs_gap"] = groups["signed_gap"].abs()
     return groups[
         [
