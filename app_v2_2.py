@@ -2,9 +2,10 @@
 
 This migration entrypoint preserves the existing UI while replacing the legacy
 metadata enrichment and variable-G metric functions with the auditable pure
-implementation in ``kratos_core.py``. It is intentionally separate from
-``app.py`` until the revised measurement regime has been validated on the
-canonical corpora.
+implementation in ``kratos_core.py``. It supports both raw Scopus exports and
+KRATOS canonical/audit CSV files containing pre-resolved first-author country
+metadata. It remains separate from ``app.py`` until the revised measurement
+regime has been validated on the canonical corpora.
 """
 
 from io import BytesIO
@@ -22,21 +23,39 @@ from kratos_core import (
     ALL_GROUPS,
     GLOBAL_NORTH_ISO3,
     GenderComputerResolver,
+    classify_region,
     compute_kratos_fixed_g,
     enrich_first_author_metadata,
+    extract_first_author,
+    extract_given_name,
 )
 
 
 legacy.APP_VERSION = "2.2.0-rc1"
 legacy.GLOBAL_NORTH = set(GLOBAL_NORTH_ISO3)
 legacy.DEFAULT_COLUMNS = {
-    "author": ["Author full names", "Authors", "Author(s)", "Author Names"],
-    # Do not auto-map the author-linked affiliation field as a generic country.
-    "country": ["Country", "First Author Country"],
-    "affiliations": ["Authors with affiliations", "Affiliations", "Affiliation"],
+    # Canonical KRATOS exports use underscores; raw Scopus uses spaces.
+    "author": [
+        "Author_Full_Names",
+        "Author full names",
+        "Authors",
+        "Author(s)",
+        "Author Names",
+    ],
+    # Prefer a first-author country if already resolved. Never auto-map Region as Country.
+    "country": [
+        "First_Author_Country",
+        "First Author Country",
+        "Country",
+    ],
+    "affiliations": [
+        "Authors with affiliations",
+        "Affiliations",
+        "Affiliation",
+    ],
     "year": ["Year", "Publication Year", "Pub Year"],
     "weight": ["Cited by", "Citations", "Times Cited", "Citation Count"],
-    "source": ["Source title", "Source Title", "Journal", "Publication Name"],
+    "source": ["Source_Title", "Source title", "Source Title", "Journal", "Publication Name"],
 }
 
 _GENDER_RESOLVER = None
@@ -49,6 +68,96 @@ def _get_gender_resolver():
     return _GENDER_RESOLVER
 
 
+def _country_to_iso3(country: object) -> str:
+    """Resolve a country label already attributed to the first author."""
+    if not isinstance(country, str) or not country.strip() or country.strip().lower() == "unknown":
+        return "unknown"
+    try:
+        iso3 = legacy.coco.CountryConverter().convert(
+            names=country.strip(), to="ISO3", not_found=None
+        )
+    except Exception:
+        return "unknown"
+    if isinstance(iso3, (list, tuple)):
+        iso3 = iso3[0] if iso3 else None
+    if iso3 is None:
+        return "unknown"
+    iso3 = str(iso3).strip()
+    return iso3 if len(iso3) == 3 and iso3.isalpha() else "unknown"
+
+
+def _enrich_from_precomputed_first_author_country(
+    df: pd.DataFrame,
+    author_col: str,
+    country_col: str,
+) -> pd.DataFrame:
+    """Enrich a canonical KRATOS CSV that already contains first-author country.
+
+    This path is intentionally distinct from raw-Scopus affiliation parsing. The
+    country is accepted only from an explicitly first-author-labelled field and
+    the provenance is recorded as ``precomputed_first_author_country``.
+    """
+    out = df.copy()
+    resolver = _get_gender_resolver()
+
+    first_authors = []
+    given_names = []
+    countries = []
+    iso3_values = []
+    regions = []
+    gender_categories = []
+    gender_raw = []
+    gender_methods = []
+    gender_status = []
+    groups = []
+
+    has_given_name = "First_Author_Given_Name" in out.columns
+
+    for _, row in out.iterrows():
+        full_names = row.get(author_col, "")
+        first_author = extract_first_author(full_names)
+        if has_given_name and isinstance(row.get("First_Author_Given_Name"), str):
+            given_name = str(row.get("First_Author_Given_Name") or "").strip()
+        else:
+            given_name = extract_given_name(full_names)
+
+        country = str(row.get(country_col) or "").strip()
+        if not country or country.lower() == "nan":
+            country = "unknown"
+        iso3 = _country_to_iso3(country)
+        region = classify_region(iso3)
+
+        result = resolver.resolve(first_author, given_name, None if country == "unknown" else country)
+        gender = result.get("category", "unknown")
+        if gender not in {"female", "male", "unknown"}:
+            gender = "unknown"
+
+        first_authors.append(first_author)
+        given_names.append(given_name)
+        countries.append(country)
+        iso3_values.append(iso3)
+        regions.append(region)
+        gender_categories.append(gender)
+        gender_raw.append(result.get("raw_result", ""))
+        gender_methods.append(result.get("method", "unknown"))
+        gender_status.append(result.get("status", "unresolved"))
+        groups.append(f"{gender} x {region}")
+
+    out["first_author"] = first_authors
+    out["given_name"] = given_names
+    out["first_author_affiliation"] = ""
+    out["country"] = countries
+    out["country_iso3"] = iso3_values
+    out["region"] = regions
+    out["region_method"] = "precomputed_first_author_country"
+    out["gender_category"] = gender_categories
+    out["gender_raw_result"] = gender_raw
+    out["gender_method"] = gender_methods
+    out["gender_resolution_status"] = gender_status
+    out["group"] = groups
+    return out
+
+
 def load_and_enrich_data_v2(
     file_bytes: bytes,
     file_name: str,
@@ -59,7 +168,13 @@ def load_and_enrich_data_v2(
     weight_col: str,
     source_col: Optional[str],
 ) -> pd.DataFrame:
-    """Load Scopus data and apply first-author demographic resolution v2."""
+    """Load data and apply first-author demographic resolution v2.
+
+    Supported inputs:
+    1. raw Scopus CSV with ``Authors with affiliations``;
+    2. canonical KRATOS CSV with ``First_Author_Country`` (or an explicitly
+       selected equivalent first-author country field).
+    """
     separator = legacy.detect_separator(file_bytes)
     df = pd.read_csv(
         BytesIO(file_bytes),
@@ -77,28 +192,34 @@ def load_and_enrich_data_v2(
     if missing:
         raise ValueError(f"Required columns missing: {missing}")
 
-    # For raw Scopus exports, author-linked affiliations are required to support
-    # first-author geography. A generic aggregate Country column is not used to
-    # overwrite first-author geography.
-    author_aff_col = affiliations_col
-    if not author_aff_col or author_aff_col not in df.columns:
-        if "Authors with affiliations" in df.columns:
-            author_aff_col = "Authors with affiliations"
-        else:
-            raise ValueError(
-                "Demographic resolution v2 requires the Scopus 'Authors with affiliations' field "
-                "to assign first-author geography reproducibly."
-            )
-
     df["_weight_numeric"] = df[weight_col].apply(legacy.parse_weight_safe)
     df["_year_numeric"] = df[year_col].apply(legacy.parse_year_safe)
 
-    enriched = enrich_first_author_metadata(
-        df,
-        author_col=author_col,
-        authors_with_affiliations_col=author_aff_col,
-        gender_resolver=_get_gender_resolver(),
-    )
+    # Prefer raw author-linked affiliations when available. Otherwise accept a
+    # precomputed first-author country field from a canonical/audit KRATOS CSV.
+    author_aff_col = affiliations_col if affiliations_col in df.columns else None
+    if author_aff_col is None and "Authors with affiliations" in df.columns:
+        author_aff_col = "Authors with affiliations"
+
+    if author_aff_col:
+        enriched = enrich_first_author_metadata(
+            df,
+            author_col=author_col,
+            authors_with_affiliations_col=author_aff_col,
+            gender_resolver=_get_gender_resolver(),
+        )
+    elif country_col and country_col in df.columns and country_col.lower() not in {"region"}:
+        enriched = _enrich_from_precomputed_first_author_country(
+            df,
+            author_col=author_col,
+            country_col=country_col,
+        )
+    else:
+        raise ValueError(
+            "Demographic resolution v2 requires either Scopus 'Authors with affiliations' "
+            "or an explicit first-author country field such as 'First_Author_Country'. "
+            "Do not map a Region column as Country."
+        )
 
     # Compatibility aliases expected by the existing Streamlit views.
     enriched["_given_name"] = enriched["given_name"]
@@ -145,9 +266,8 @@ def compute_group_justice_metrics_v2(
     weight_col: str,
     kcdi_corpus: float,
 ):
-    # A(u) and S(u) do not depend on lambda. We derive those factors once from
-    # the fixed-G core, then rescale group KJI with the KCDI supplied by the UI
-    # so the selected lambda is respected consistently.
+    # A(u) and S(u) do not depend on lambda. Derive those factors once from the
+    # fixed-G core, then rescale group KJI with the KCDI supplied by the UI.
     groups, _ = compute_kratos_fixed_g(df, group_col, weight_col, 0.5)
     groups["KJI_group"] = kcdi_corpus * groups["A_factor"] * groups["S_factor"]
     groups["abs_gap"] = groups["signed_gap"].abs()
@@ -198,7 +318,7 @@ def generate_snapshot_export_v2(lambda_param: float, column_mappings: Dict, corp
             "group_universe": list(ALL_GROUPS),
             "G": 9,
             "parity_reference": "1/9",
-            "geography_unit": "first author; first listed affiliation",
+            "geography_unit": "first author; raw affiliation or precomputed first-author country",
             "gender_method": "genderComputer@f626761; conservative unknown",
             "gender_interpretation": "metadata-derived proxy, not self-identified gender",
             "kji_identity": "KJI = KCDI * mean(A*S)",
