@@ -90,3 +90,7 @@ The default stochastic sensitivity seed is `20260831`; manuscript analyses shoul
 ## Interpretation
 
 KRATOS is a **recognition-comparability diagnostic**. Corpus-level values should not be read as direct rankings of epistemic justice. Cross-corpus interpretation requires the accompanying common-window, matched-size, parameter, and unresolved-metadata sensitivity analyses.
+
+## Validation status
+
+The production code path (`app.py` → `kratos_core.py`) is compiled and exercised in CI. The test suite includes a Streamlit startup smoke test; a successful merge requires the current branch checks to pass.
