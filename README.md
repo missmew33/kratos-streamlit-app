@@ -1,8 +1,8 @@
-# KRATOS — Bibliometric Recognition Diagnostics
+# KRATOS v2.2 — Bibliometric Recognition Diagnostic
 
-KRATOS is an auditable Python/Streamlit research instrument for examining whether bibliometric recognition signals are distributed comparably across predefined knowledge-producing groups.
+KRATOS is an auditable Python/Streamlit research instrument for examining whether bibliometric recognition signals are distributed comparably across predefined knowledge-producing positions.
 
-The current methodological branch implements the measurement regime used in the Scientometrics revision. It should not be interpreted as a ground-truth measure of epistemic justice or epistemic change.
+The production application is `app.py`. The computational definitions live in `kratos_core.py` and are covered by regression tests.
 
 ## Current measurement regime
 
@@ -13,108 +13,80 @@ The substantive analytical universe is fixed at **G=4**:
 - male × Global North
 - male × Global South
 
-Gender is a metadata-derived name-based proxy, not self-identified gender. Unresolved gender or geography remains an **audit/coverage state** and is not assigned a parity target.
+Gender is a **metadata-derived proxy**, not self-identified gender. Unresolved gender or geography remains an `unknown` audit state and is excluded from the primary G=4 parity universe. Demographic coverage is reported explicitly.
 
-One document is attributed to the first author. Geography is resolved from the first listed affiliation of that author using conservative exact-country matching.
+One document is attributed to the **first author**. For raw Scopus data, geography is resolved from the first listed affiliation of that first author using conservative exact-country matching.
 
-## KCDI architecture
+## KRATOS metrics
 
-KRATOS separates marginal distribution from participation–recognition alignment.
-
-### Document-distribution entropy
-
-`H_D_prime` is normalised Shannon entropy over document shares in the fixed four-cell universe:
+For document shares `p_u` and citation shares `s_u` over the fixed four-cell universe:
 
 ```text
-H_D_prime = -sum(p_u * ln(p_u)) / ln(4)
+H_D_prime = normalised Shannon entropy of document shares
+H_C_prime = normalised Shannon entropy of citation shares
+KCDI      = H_D_prime^lambda * H_C_prime^(1-lambda)
+A(u)      = max(0, 1 - |p_u - 1/4| / (1/4))
+S(u)      = max(0, 1 - |s_u/p_u - 1|)
+P         = mean[A(u) * S(u)] over G=4
+R         = 1 - P
+KJI       = KCDI * P
 ```
 
-### Citation-distribution entropy
+The primary specification uses `lambda = 0.5`.
 
-`H_C_prime` applies the same normalised entropy to group citation shares:
+`KJI <= KCDI` and `KCDI - KJI = KCDI(1-P)` are architectural identities. They are **not** empirical tests of canonical closure, epistemic stigma, or epistemic injustice.
+
+### Why `W_norm` was removed
+
+The former range-normalised component
 
 ```text
-H_C_prime = -sum(s_u * ln(s_u)) / ln(4)
+(mean - min) / (max - min)
 ```
 
-The earlier range-normalised citation component `W_norm` has been removed from the computational core. Its min/mean/max construction did not behave monotonically as a citation-balance measure and was therefore replaced after mathematical audit.
-
-### KCDI
-
-```text
-KCDI = H_D_prime^lambda * H_C_prime^(1-lambda)
-```
-
-The primary specification uses `lambda = 0.5`; sensitivity analyses evaluate alternative values.
-
-## Participation–recognition parity
-
-For each substantive group `u`, KRATOS computes:
-
-```text
-A(u) = max(0, 1 - abs(p_u - 0.25) / 0.25)
-S(u) = max(0, 1 - abs(s_u / p_u - 1))
-```
-
-with `S(u)=0` when `p_u=0`.
-
-The corpus-level parity factor is:
-
-```text
-P = mean(A(u) * S(u))
-R = 1 - P
-KJI = KCDI * P
-```
-
-`KJI <= KCDI` is an architectural identity, not empirical evidence of canonical closure, epistemic stigma, discrimination, or epistemic injustice.
+did not behave as a valid measure of citation evenness: near-equal citation totals could receive low values, more unequal configurations could receive higher values, and the equality convention introduced a discontinuity. KRATOS v2.2 therefore uses `H_C_prime`, normalised Shannon entropy of citation shares over the same fixed G=4 universe as `H_D_prime`.
 
 ## Citation concentration
 
-Gini, HHI and Top-10% citation share are computed separately on the complete canonical corpus. They are descriptive concentration diagnostics and are not components of KCDI or KJI.
+Document-level citation concentration is reported separately using:
 
-## Demographic resolution
+- Gini coefficient
+- Herfindahl–Hirschman Index (HHI)
+- Top 10% citation share
 
-The current branch uses the open-source `genderComputer` backend pinned to revision `f6267615517913e53cb0b882b248f1c2e11b8bbc`.
+These are full-corpus descriptive diagnostics and are not components of KCDI, P, or KJI.
 
-Only exact `female` or `male` outputs are accepted. `unisex`, missing, unresolved and error states remain `unknown`.
+## Inputs
 
-Country resolution uses exact country-name tokens from the first author's first listed affiliation. Fuzzy location matching is deliberately avoided.
+The production Streamlit application accepts CSV files with a citation-count column plus one of the following:
 
-## Reproducibility tools
+1. raw Scopus `Authors with affiliations` data;
+2. an explicit first-author country field; or
+3. precomputed KRATOS demographic audit fields (`group`, `gender_category`, `region`).
 
-Core computation:
+Licensed Scopus source records are not committed to this public repository.
 
-```text
-kratos_core.py
-```
-
-Run a canonical Scopus-derived CSV through the auditable pipeline:
-
-```bash
-python scripts/kratos_analyze_csv.py input.csv --output-dir kratos_output
-```
-
-Run unresolved-gender and matched-size sensitivity analyses:
+## Run locally
 
 ```bash
-python scripts/kratos_g4_sensitivity.py kratos_output/demographic_audit.csv \
-  --matched-n 101 --B 1000 --seed 20260831
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-Licensed Scopus source records are not stored in this public repository.
-
-## Streamlit status
-
-`app_v2_2.py` is the release-candidate wrapper around the legacy Streamlit interface and uses the revised `kratos_core.py` calculations. The production `app.py` still contains legacy UI text and is intentionally not yet treated as the frozen manuscript implementation. The release-candidate wrapper exposes temporary legacy renderer aliases only to avoid breaking that UI; reproducibility exports use `H_D_prime` and `H_C_prime`.
-
-## Tests
+The compatibility entrypoint also remains valid:
 
 ```bash
-pytest -q
+streamlit run app_v2_2.py
 ```
 
-Regression tests cover the fixed G=4 universe, treatment of unresolved metadata, conservative geography parsing, citation-entropy boundary behaviour, scale invariance, and the architectural constraint `KJI <= KCDI`.
+## Reproducibility utilities
 
-## Licence
+- `scripts/kratos_analyze_csv.py`: record-level demographic audit, G=4 group metrics, corpus snapshot, and full-corpus citation concentration.
+- `scripts/kratos_g4_sensitivity.py`: unresolved-gender sensitivity and matched-size resampling.
+- `tests/`: regression tests for geography resolution, fixed G=4 treatment, citation entropy, KCDI boundary behaviour, and KJI architecture.
 
-MIT.
+The default stochastic sensitivity seed is `20260831`; manuscript analyses should record the exact seed, draw count, input hashes, and software revision used for the frozen results.
+
+## Interpretation
+
+KRATOS is a **recognition-comparability diagnostic**. Corpus-level values should not be read as direct rankings of epistemic justice. Cross-corpus interpretation requires the accompanying common-window, matched-size, parameter, and unresolved-metadata sensitivity analyses.
