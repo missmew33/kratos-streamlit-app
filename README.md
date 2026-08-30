@@ -1,93 +1,92 @@
-# KCDI Streamlit App — Knowledge Justice Analytics for Scopus Data
+# KRATOS v2.2 — Bibliometric Recognition Diagnostic
 
-An interactive web application that turns Scopus-exported metadata into **epistemic diversity and justice diagnostics** using the **Knowledge Contribution Diversity Index (KCDI)**.  
-Built in **Python** and delivered as a **Streamlit** web app so the full analytical pipeline can be executed, inspected, and replicated without running scripts manually.
+KRATOS is an auditable Python/Streamlit research instrument for examining whether bibliometric recognition signals are distributed comparably across predefined knowledge-producing positions.
 
----
+The production application is `app.py`. The computational definitions live in `kratos_core.py` and are covered by regression tests and a Streamlit startup smoke test.
 
-## What this app is (as a research instrument)
+## Current measurement regime
 
-This app is not only a calculator. It is a **computational research instrument** that operationalises KCDI as a structured pipeline:
+The substantive analytical universe is fixed at **G=4**:
 
-1. **Data input** (Scopus export upload)
-2. **Column selection and parameterisation** (explicit analytical choices)
-3. **Data enrichment** (gender-coded proxy + country/region classification)
-4. **Metric computation** (KCDI and supporting components)
-5. **Diagnostic visual analytics** (tables + plots for interpretability)
-6. **Export for audit and reproducibility**
+- female × Global North
+- female × Global South
+- male × Global North
+- male × Global South
 
-The interface is designed so that key assumptions (e.g., grouping variables, weights, proxies, and parameters) are **visible**, which is essential for interpretability and for comparing results across different corpora.
+Gender is a **metadata-derived proxy**, not self-identified gender. Unresolved gender or geography remains an `unknown` audit state and is excluded from the primary G=4 parity universe. Demographic coverage is reported explicitly.
 
----
+One document is attributed to the **first author**. For raw Scopus data, geography is resolved from the first listed affiliation of that first author using conservative exact-country matching.
 
-## What the app does
+## KRATOS metrics
 
-### 1) Data input
-- Upload a Scopus-style dataset in `.csv` or `.xlsx`
-- Preview the dataset immediately to verify correct parsing (first rows)
+For document shares `p_u` and citation shares `s_u` over the fixed four-cell universe:
 
-### 2) Columns and parameters
-- Select or confirm which columns correspond to:
-  - authors
-  - country (or affiliation-derived country)
-  - year (optional but recommended)
-  - citations / impact proxy (optional; used for weighting if available)
-- Set key parameters (when enabled in the current version), such as the blending parameter used in the KCDI formulation.
+```text
+H_D_prime = normalised Shannon entropy of document shares
+H_C_prime = normalised Shannon entropy of citation shares
+KCDI      = H_D_prime^lambda * H_C_prime^(1-lambda)
+A(u)      = max(0, 1 - |p_u - 1/4| / (1/4))
+S(u)      = max(0, 1 - |s_u/p_u - 1|)
+P         = mean[A(u) * S(u)] over G=4
+R         = 1 - P
+KJI       = KCDI * P
+```
 
-### 3) Enriched dataset (auditable)
-The app generates an enriched analytical dataset including:
-- author name extraction (for proxy coding)
-- **gender-coded labels** (proxy inference when not provided by the source)
-- country normalisation and mapping
-- **region classification** (e.g., Global North / Global South proxy)
+The primary specification uses `lambda = 0.5`.
 
-A preview of the enriched table is shown to support auditing before interpreting results.
+`KJI <= KCDI` and `KCDI - KJI = KCDI(1-P)` are architectural identities. They are **not** empirical tests of canonical closure, epistemic stigma, or epistemic injustice.
 
-### 4) KCDI metrics
-The app computes:
-- **KCDI** by selected grouping variables (e.g., gender, region, or intersection)
-- supporting components required for interpretability (e.g., diversity and weighting terms, group sizes)
+### Why `W_norm` was removed
 
-### 5) Visual diagnostics
-Interactive plots help interpret structural patterns and compare groups, including:
-- group-level KCDI comparisons
-- intersectional comparisons (e.g., gender × region)
-- (when available) time-based summaries
+The former range-normalised component
 
-### 6) Export
-- Download the enriched dataset and/or summary outputs for independent verification or extended analysis.
+```text
+(mean - min) / (max - min)
+```
 
----
+did not behave as a valid measure of citation evenness: near-equal citation totals could receive low values, more unequal configurations could receive higher values, and the equality convention introduced a discontinuity. KRATOS v2.2 therefore uses `H_C_prime`, normalised Shannon entropy of citation shares over the same fixed G=4 universe as `H_D_prime`.
 
-## Input requirements
+## Citation concentration
 
-Minimum required fields:
-- `Authors` (or equivalent author-name field)
-- `Country` (or a field from which country can be derived)
+Document-level citation concentration is reported separately using:
 
-Recommended fields:
-- `Year` (enables temporal diagnostics)
-- `Cited by` (enables citation-weighted variants where applicable)
+- Gini coefficient
+- Herfindahl–Hirschman Index (HHI)
+- Top 10% citation share
 
----
+These are full-corpus descriptive diagnostics and are not components of KCDI, P, or KJI.
 
-## How to use
+## Inputs
 
-1. Upload a Scopus-exported `.csv` or `.xlsx` file.
-2. Confirm/select the correct columns under **Columns and parameters**.
-3. Inspect the **Raw data** preview (parsing check).
-4. Inspect the **Enriched data** preview (enrichment check).
-5. Read KCDI outputs and plots; export results if needed.
+The production Streamlit application accepts CSV files with a citation-count column plus one of the following:
 
----
+1. raw Scopus `Authors with affiliations` data;
+2. an explicit first-author country field; or
+3. precomputed KRATOS demographic audit fields (`group`, `gender_category`, `region`).
 
-## Deployment
+Licensed Scopus source records are not committed to this public repository.
 
-The app runs on **Streamlit Community Cloud** and can also be executed locally.
-
-### Run locally
+## Run locally
 
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
+```
 
+The compatibility entrypoint also remains valid:
+
+```bash
+streamlit run app_v2_2.py
+```
+
+## Reproducibility utilities
+
+- `scripts/kratos_analyze_csv.py`: record-level demographic audit, G=4 group metrics, corpus snapshot, and full-corpus citation concentration.
+- `scripts/kratos_g4_sensitivity.py`: unresolved-gender sensitivity and matched-size resampling.
+- `tests/`: regression tests for geography resolution, fixed G=4 treatment, citation entropy, KCDI boundary behaviour, KJI architecture, and production-app startup.
+
+The default stochastic sensitivity seed is `20260831`; manuscript analyses should record the exact seed, draw count, input hashes, and software revision used for the frozen results.
+
+## Interpretation
+
+KRATOS is a **recognition-comparability diagnostic**. Corpus-level values should not be read as direct rankings of epistemic justice. Cross-corpus interpretation requires the accompanying common-window, matched-size, parameter, and unresolved-metadata sensitivity analyses.
