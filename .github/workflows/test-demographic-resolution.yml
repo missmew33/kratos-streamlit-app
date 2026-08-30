@@ -28,3 +28,16 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: pytest -q
+      - name: Bundle open-source runtime dependencies for local validation
+        run: |
+          mkdir -p dependency_bundle
+          python -m pip install --no-deps --target dependency_bundle country-converter
+          python -m pip install --no-deps --target dependency_bundle 'genderComputer @ git+https://github.com/tue-mdse/genderComputer.git@f6267615517913e53cb0b882b248f1c2e11b8bbc'
+          python -m pip install --no-deps --target dependency_bundle python-nameparser Unidecode
+      - name: Upload dependency bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: kratos-open-source-dependencies
+          path: dependency_bundle
+          if-no-files-found: error
+          retention-days: 1
