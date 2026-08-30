@@ -2,10 +2,9 @@
 
 This migration entrypoint preserves the existing UI while replacing the legacy
 metadata enrichment and variable-G metric functions with the auditable pure
-implementation in ``kratos_core.py``. It supports both raw Scopus exports and
-KRATOS canonical/audit CSV files containing pre-resolved first-author country
-metadata. It remains separate from ``app.py`` until the revised measurement
-regime has been validated on the canonical corpora.
+implementation in ``kratos_core.py``. The substantive measurement universe is
+G=4 (female/male x Global North/South); unresolved metadata remain audit states
+and are reported through demographic coverage.
 """
 
 from io import BytesIO
@@ -31,10 +30,9 @@ from kratos_core import (
 )
 
 
-legacy.APP_VERSION = "2.2.0-rc1"
+legacy.APP_VERSION = "2.2.0-rc2"
 legacy.GLOBAL_NORTH = set(GLOBAL_NORTH_ISO3)
 legacy.DEFAULT_COLUMNS = {
-    # Canonical KRATOS exports use underscores; raw Scopus uses spaces.
     "author": [
         "Author_Full_Names",
         "Author full names",
@@ -42,7 +40,6 @@ legacy.DEFAULT_COLUMNS = {
         "Author(s)",
         "Author Names",
     ],
-    # Prefer a first-author country if already resolved. Never auto-map Region as Country.
     "country": [
         "First_Author_Country",
         "First Author Country",
@@ -69,7 +66,7 @@ def _get_gender_resolver():
 
 
 def _country_to_iso3(country: object) -> str:
-    """Resolve a country label already attributed to the first author."""
+    """Resolve a country label already attributed explicitly to the first author."""
     if not isinstance(country, str) or not country.strip() or country.strip().lower() == "unknown":
         return "unknown"
     try:
@@ -91,12 +88,7 @@ def _enrich_from_precomputed_first_author_country(
     author_col: str,
     country_col: str,
 ) -> pd.DataFrame:
-    """Enrich a canonical KRATOS CSV that already contains first-author country.
-
-    This path is intentionally distinct from raw-Scopus affiliation parsing. The
-    country is accepted only from an explicitly first-author-labelled field and
-    the provenance is recorded as ``precomputed_first_author_country``.
-    """
+    """Enrich a canonical KRATOS CSV containing first-author country."""
     out = df.copy()
     resolver = _get_gender_resolver()
 
@@ -172,8 +164,7 @@ def load_and_enrich_data_v2(
 
     Supported inputs:
     1. raw Scopus CSV with ``Authors with affiliations``;
-    2. canonical KRATOS CSV with ``First_Author_Country`` (or an explicitly
-       selected equivalent first-author country field).
+    2. canonical KRATOS CSV with an explicit first-author country field.
     """
     separator = legacy.detect_separator(file_bytes)
     df = pd.read_csv(
@@ -195,8 +186,6 @@ def load_and_enrich_data_v2(
     df["_weight_numeric"] = df[weight_col].apply(legacy.parse_weight_safe)
     df["_year_numeric"] = df[year_col].apply(legacy.parse_year_safe)
 
-    # Prefer raw author-linked affiliations when available. Otherwise accept a
-    # precomputed first-author country field from a canonical/audit KRATOS CSV.
     author_aff_col = affiliations_col if affiliations_col in df.columns else None
     if author_aff_col is None and "Authors with affiliations" in df.columns:
         author_aff_col = "Authors with affiliations"
@@ -221,7 +210,6 @@ def load_and_enrich_data_v2(
             "Do not map a Region column as Country."
         )
 
-    # Compatibility aliases expected by the existing Streamlit views.
     enriched["_given_name"] = enriched["given_name"]
     enriched["Gender"] = enriched["gender_category"]
     enriched["Region"] = enriched["region"]
@@ -254,9 +242,12 @@ def compute_kcdi_corpus_v2(
     return details["KCDI"], {
         "H_prime": details["H_prime"],
         "W_norm": details["W_norm"],
-        "n_groups": 9,
+        "n_groups": len(ALL_GROUPS),
         "lambda": details["lambda"],
         "KCDI_corpus": details["KCDI"],
+        "demographic_coverage": details["demographic_coverage"],
+        "n_docs_input": details["n_docs_input"],
+        "n_docs_resolved": details["n_docs_resolved"],
     }
 
 
@@ -266,8 +257,6 @@ def compute_group_justice_metrics_v2(
     weight_col: str,
     kcdi_corpus: float,
 ):
-    # A(u) and S(u) do not depend on lambda. Derive those factors once from the
-    # fixed-G core, then rescale group KJI with the KCDI supplied by the UI.
     groups, _ = compute_kratos_fixed_g(df, group_col, weight_col, 0.5)
     groups["KJI_group"] = kcdi_corpus * groups["A_factor"] * groups["S_factor"]
     groups["abs_gap"] = groups["signed_gap"].abs()
@@ -297,7 +286,7 @@ def compute_corpus_kji_v2(
     return details["KJI"], {
         "H_prime": details["H_prime"],
         "W_norm": details["W_norm"],
-        "n_groups": 9,
+        "n_groups": len(ALL_GROUPS),
         "lambda": details["lambda"],
         "KCDI_corpus": details["KCDI"],
         "KJI_mean": details["KJI"],
@@ -306,21 +295,29 @@ def compute_corpus_kji_v2(
         "P": details["P"],
         "R": details["R"],
         "Delta": details["Delta"],
+        "demographic_coverage": details["demographic_coverage"],
+        "n_docs_input": details["n_docs_input"],
+        "n_docs_resolved": details["n_docs_resolved"],
     }
 
 
-def generate_snapshot_export_v2(lambda_param: float, column_mappings: Dict, corpus_info: Dict[str, Dict]) -> str:
+def generate_snapshot_export_v2(
+    lambda_param: float,
+    column_mappings: Dict,
+    corpus_info: Dict[str, Dict],
+) -> str:
     snapshot = {
         "app_version": legacy.APP_VERSION,
         "timestamp": datetime.now().isoformat(),
         "lambda": lambda_param,
         "measurement_regime": {
             "group_universe": list(ALL_GROUPS),
-            "G": 9,
-            "parity_reference": "1/9",
+            "G": len(ALL_GROUPS),
+            "parity_reference": "1/4",
             "geography_unit": "first author; raw affiliation or precomputed first-author country",
             "gender_method": "genderComputer@f626761; conservative unknown",
             "gender_interpretation": "metadata-derived proxy, not self-identified gender",
+            "unknown_treatment": "audit/coverage state; excluded from primary parity universe",
             "kji_identity": "KJI = KCDI * mean(A*S)",
         },
         "column_mappings": column_mappings,
@@ -331,7 +328,6 @@ def generate_snapshot_export_v2(lambda_param: float, column_mappings: Dict, corp
     return json.dumps(snapshot, indent=2)
 
 
-# Replace legacy computational functions before running the existing UI.
 legacy.load_and_enrich_data = load_and_enrich_data_v2
 legacy.compute_kcdi_corpus = compute_kcdi_corpus_v2
 legacy.compute_group_justice_metrics = compute_group_justice_metrics_v2
