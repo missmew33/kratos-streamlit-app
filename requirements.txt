@@ -1,7 +1,7 @@
-   streamlit>=1.30.0
-   pandas>=2.0.0
-   numpy>=1.24.0
-   plotly>=5.18.0
-   gender-guesser>=0.4.0
-   country-converter>=1.1.0
-   scipy>=1.10.0
+streamlit>=1.30.0
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.18.0
+country-converter>=1.1.0
+scipy>=1.10.0
+genderComputer @ git+https://github.com/tue-mdse/genderComputer.git@f6267615517913e53cb0b882b248f1c2e11b8bbc
