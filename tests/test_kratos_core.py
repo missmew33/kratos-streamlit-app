@@ -1,8 +1,11 @@
+import math
+
 import pandas as pd
 
 from kratos_core import (
     ALL_GROUPS,
     G,
+    compute_citation_entropy_fixed,
     compute_kratos_fixed_g,
     extract_first_author,
     extract_given_name,
@@ -131,6 +134,9 @@ def test_fixed_g4_retains_four_substantive_cells_and_excludes_unknown_from_parit
     assert abs(details["demographic_coverage"] - 0.75) < 1e-12
     assert 0 <= details["KJI"] <= details["KCDI"] <= 1
     assert abs(details["R"] - (1 - details["P"])) < 1e-12
+    assert "W_norm" not in details
+    assert "H_D_prime" in details
+    assert "H_C_prime" in details
 
 
 def test_unknown_only_records_do_not_create_substantive_parity_cell():
@@ -157,5 +163,53 @@ def test_empty_substantive_cells_are_not_dropped_from_entropy_reference():
     )
     groups, details = compute_kratos_fixed_g(df)
     assert len(groups) == 4
-    assert details["H_prime"] == 0.0
+    assert details["H_D_prime"] == 0.0
+    assert details["H_C_prime"] == 0.0
     assert (groups["n_docs"] == 0).sum() == 3
+
+
+def test_citation_entropy_is_one_for_equal_group_citation_totals():
+    citations = {group: 10.0 for group in ALL_GROUPS}
+    assert abs(compute_citation_entropy_fixed(citations) - 1.0) < 1e-12
+
+
+def test_citation_entropy_is_zero_for_complete_concentration():
+    citations = {group: 0.0 for group in ALL_GROUPS}
+    citations[ALL_GROUPS[0]] = 100.0
+    assert compute_citation_entropy_fixed(citations) == 0.0
+
+
+def test_citation_entropy_is_near_one_for_near_equal_totals():
+    citations = dict(zip(ALL_GROUPS, [10.0, 10.0, 10.0, 11.0]))
+    h_c = compute_citation_entropy_fixed(citations)
+    assert 0.99 < h_c < 1.0
+
+
+def test_kcdi_endpoint_lambda_values_are_defined():
+    df = pd.DataFrame(
+        {
+            "group": list(ALL_GROUPS),
+            "Cited by": [1, 2, 3, 4],
+        }
+    )
+    _, details_zero = compute_kratos_fixed_g(df, lambda_param=0.0)
+    _, details_one = compute_kratos_fixed_g(df, lambda_param=1.0)
+    assert math.isclose(details_zero["KCDI"], details_zero["H_C_prime"])
+    assert math.isclose(details_one["KCDI"], details_one["H_D_prime"])
+
+
+def test_uniform_scaling_of_citations_does_not_change_entropy_or_parity():
+    base = pd.DataFrame(
+        {
+            "group": list(ALL_GROUPS),
+            "Cited by": [2, 4, 6, 8],
+        }
+    )
+    scaled = base.copy()
+    scaled["Cited by"] = scaled["Cited by"] * 10
+    _, d1 = compute_kratos_fixed_g(base)
+    _, d2 = compute_kratos_fixed_g(scaled)
+    assert math.isclose(d1["H_C_prime"], d2["H_C_prime"])
+    assert math.isclose(d1["P"], d2["P"])
+    assert math.isclose(d1["KCDI"], d2["KCDI"])
+    assert math.isclose(d1["KJI"], d2["KJI"])
