@@ -13,7 +13,8 @@ Design principles
 * the substantive analytical universe is G=4: female/male x Global North/South;
 * unresolved metadata are excluded from parity expectations and reported as
   measurement coverage rather than treated as substantive demographic groups;
-* KJI <= KCDI is an architectural property, not an empirical test.
+* KCDI combines document-distribution entropy and citation-distribution entropy;
+* KJI = KCDI * P, so KJI <= KCDI is architectural rather than empirical.
 """
 
 from __future__ import annotations
@@ -46,7 +47,7 @@ ALL_GROUPS: Tuple[str, ...] = tuple(
 )
 G = len(ALL_GROUPS)
 
-# Canonical KRATOS v2.1.0 set. The executable constant contains 39 ISO3 codes.
+# Canonical KRATOS set. The executable constant contains 39 ISO3 codes.
 GLOBAL_NORTH_ISO3 = frozenset(
     {
         "USA", "CAN", "GBR", "FRA", "DEU", "ITA", "ESP", "NLD", "BEL", "LUX",
@@ -83,7 +84,6 @@ def _build_exact_country_lookup() -> Dict[str, str]:
             if key:
                 lookup[key] = iso3
 
-    # Common exact Scopus variants not always represented as short/official names.
     lookup.update(
         {
             "macao": "MAC",
@@ -170,13 +170,7 @@ def _country_to_iso3(candidate: str) -> Optional[str]:
 
 
 def _explicit_country_tokens(first_author_block: str) -> Sequence[str]:
-    """Return conservative country candidates from a Scopus author block.
-
-    Scopus formats an author-affiliation block as ``Surname, Given names, ...``.
-    The first two comma-delimited components are author-name material and are
-    excluded. Short code-like tokens are also rejected. Remaining tokens are
-    considered only if they exactly match a recognised country name.
-    """
+    """Return conservative country candidates from a Scopus author block."""
     parts = [part.strip() for part in first_author_block.split(",") if part.strip()]
     affiliation_parts = parts[2:] if len(parts) >= 3 else []
 
@@ -193,12 +187,7 @@ def _explicit_country_tokens(first_author_block: str) -> Sequence[str]:
 
 
 def resolve_first_author_country(authors_with_affiliations: object) -> Tuple[str, str, str]:
-    """Resolve first-listed first-author country to (country, ISO3, method).
-
-    Only the first author's block is inspected. A token is accepted only when it
-    exactly matches a recognised country name. This deliberately prefers
-    ``unknown`` to fuzzy country inference.
-    """
+    """Resolve first-listed first-author country to (country, ISO3, method)."""
     block = extract_first_author_affiliation(authors_with_affiliations)
     if not block:
         return "unknown", "unknown", "first_author_affiliation_unresolved"
@@ -342,30 +331,37 @@ def _complete_group_series(series: pd.Series, values: Sequence[str]) -> pd.Serie
     return series.reindex(values, fill_value=0.0).astype(float)
 
 
-def compute_shannon_entropy_fixed(group_counts: Mapping[str, float]) -> float:
-    """Normalised Shannon entropy over the fixed substantive G=4 universe."""
-    total = float(sum(group_counts.get(group, 0.0) for group in ALL_GROUPS))
-    if total <= 0:
+def compute_shannon_entropy_fixed(group_values: Mapping[str, float]) -> float:
+    """Normalised Shannon entropy over the fixed substantive G=4 universe.
+
+    The mapping may contain document counts or non-negative group citation totals.
+    Empty cells remain in the fixed denominator through normalisation by ln(G).
+    """
+    values = [max(0.0, float(group_values.get(group, 0.0))) for group in ALL_GROUPS]
+    total = float(sum(values))
+    if total <= 0.0:
         return 0.0
+
     entropy = 0.0
-    for group in ALL_GROUPS:
-        count = float(group_counts.get(group, 0.0))
-        if count > 0:
-            p = count / total
-            entropy -= p * math.log(p)
-    return entropy / math.log(G)
+    for value in values:
+        if value > 0.0:
+            share = value / total
+            entropy -= share * math.log(share)
+    return float(entropy / math.log(G))
 
 
-def compute_weight_normalization_fixed(group_weights: Mapping[str, float]) -> float:
-    """Range-normalise group citation totals across the four substantive cells."""
-    values = np.array([float(group_weights.get(group, 0.0)) for group in ALL_GROUPS], dtype=float)
-    if values.size == 0 or np.all(values == 0.0):
-        return 0.0
-    w_min = float(values.min())
-    w_max = float(values.max())
-    if w_max == w_min:
-        return 1.0
-    return float((values.mean() - w_min) / (w_max - w_min))
+def compute_citation_entropy_fixed(group_citations: Mapping[str, float]) -> float:
+    """Normalised Shannon entropy of citation shares over fixed G=4."""
+    return compute_shannon_entropy_fixed(group_citations)
+
+
+def _weighted_geometric_kcdi(h_d_prime: float, h_c_prime: float, lambda_param: float) -> float:
+    """Combine document and citation evenness without undefined 0**0 endpoints."""
+    if lambda_param == 0.0:
+        return float(h_c_prime)
+    if lambda_param == 1.0:
+        return float(h_d_prime)
+    return float((h_d_prime ** lambda_param) * (h_c_prime ** (1.0 - lambda_param)))
 
 
 def compute_kratos_fixed_g(
@@ -374,13 +370,13 @@ def compute_kratos_fixed_g(
     weight_col: str = "Cited by",
     lambda_param: float = 0.5,
 ) -> Tuple[pd.DataFrame, Dict[str, float]]:
-    """Compute corpus/group KRATOS quantities with substantive fixed G=4.
+    """Compute KRATOS quantities under the substantive fixed G=4 regime.
 
     Only records with resolved female/male gender and Global North/Global South
-    geography enter the parity calculation. Unresolved records remain in the
-    record-level audit and are reflected in ``demographic_coverage``; they are
-    not assigned an artificial parity target. Empty substantive cells are
-    retained. ``KJI <= KCDI`` follows by construction because P=mean(A*S) <= 1.
+    geography enter the primary calculation. Unresolved records remain audit
+    states and contribute to demographic-coverage reporting. KCDI combines
+    document-distribution entropy (H_D_prime) and citation-distribution entropy
+    (H_C_prime). P=mean(A*S), KJI=KCDI*P, and KJI<=KCDI by construction.
     """
     if group_col not in df.columns:
         raise ValueError(f"Missing group column: {group_col}")
@@ -401,10 +397,10 @@ def compute_kratos_fixed_g(
     counts = _complete_group_series(work[group_col].value_counts(), ALL_GROUPS)
     weights = _complete_group_series(work.groupby(group_col)[weight_col].sum(), ALL_GROUPS)
 
-    h_prime = compute_shannon_entropy_fixed(counts.to_dict())
-    w_norm = compute_weight_normalization_fixed(weights.to_dict())
+    h_d_prime = compute_shannon_entropy_fixed(counts.to_dict())
+    h_c_prime = compute_citation_entropy_fixed(weights.to_dict())
     kcdi = (
-        float((h_prime ** lambda_param) * (w_norm ** (1.0 - lambda_param)))
+        _weighted_geometric_kcdi(h_d_prime, h_c_prime, lambda_param)
         if n_total > 0
         else 0.0
     )
@@ -428,6 +424,7 @@ def compute_kratos_fixed_g(
                 "total_weight": citations,
                 "doc_share": p_u,
                 "weight_share": s_u,
+                "citation_share": s_u,
                 "signed_gap": s_u - p_u,
                 "A_factor": a_u,
                 "S_factor": s_factor,
@@ -446,8 +443,8 @@ def compute_kratos_fixed_g(
         "n_docs_resolved": float(n_total),
         "demographic_coverage": (float(n_total / n_input) if n_input else 0.0),
         "total_weight": total_weight,
-        "H_prime": h_prime,
-        "W_norm": w_norm,
+        "H_D_prime": h_d_prime,
+        "H_C_prime": h_c_prime,
         "lambda": float(lambda_param),
         "KCDI": kcdi,
         "P": parity_factor,
