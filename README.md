@@ -2,7 +2,7 @@
 
 KRATOS is an auditable Python/Streamlit research instrument for examining whether bibliometric recognition signals are distributed comparably across predefined knowledge-producing positions.
 
-The production application is `app.py`. The computational definitions live in `kratos_core.py` and are covered by regression tests.
+The production application is `app.py`. The computational definitions live in `kratos_core.py` and are covered by regression tests and a Streamlit startup smoke test.
 
 ## Current measurement regime
 
@@ -83,7 +83,7 @@ streamlit run app_v2_2.py
 
 - `scripts/kratos_analyze_csv.py`: record-level demographic audit, G=4 group metrics, corpus snapshot, and full-corpus citation concentration.
 - `scripts/kratos_g4_sensitivity.py`: unresolved-gender sensitivity and matched-size resampling.
-- `tests/`: regression tests for geography resolution, fixed G=4 treatment, citation entropy, KCDI boundary behaviour, and KJI architecture.
+- `tests/`: regression tests for geography resolution, fixed G=4 treatment, citation entropy, KCDI boundary behaviour, KJI architecture, and production-app startup.
 
 The default stochastic sensitivity seed is `20260831`; manuscript analyses should record the exact seed, draw count, input hashes, and software revision used for the frozen results.
 
