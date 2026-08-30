@@ -1,4 +1,9 @@
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_production_app_import_and_version():
@@ -16,5 +21,5 @@ def test_v22_compatibility_entrypoint_uses_production_main():
 
 
 def test_production_streamlit_app_starts_without_exception():
-    app_test = AppTest.from_file("app.py", default_timeout=30).run()
+    app_test = AppTest.from_file(ROOT / "app.py", default_timeout=30).run()
     assert not app_test.exception
