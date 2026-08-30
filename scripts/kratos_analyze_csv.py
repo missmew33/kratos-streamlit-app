@@ -3,8 +3,8 @@
 
 The script writes:
 - record-level demographic audit CSV;
-- nine-cell group metrics CSV;
-- corpus summary JSON.
+- four-cell substantive group metrics CSV;
+- corpus summary JSON including demographic coverage and full-corpus citation concentration.
 
 Scopus source data are not stored in the GitHub repository.
 """
@@ -52,6 +52,8 @@ def main() -> None:
         weight_col=args.weight_col,
         lambda_param=args.lambda_param,
     )
+    # Concentration is a document-level full-corpus diagnostic and therefore
+    # does not depend on demographic resolution coverage.
     concentration = compute_citation_concentration(enriched[args.weight_col])
 
     audit_columns = [
@@ -78,9 +80,14 @@ def main() -> None:
     snapshot = {
         "input_file": args.input_csv.name,
         "lambda": args.lambda_param,
-        "demographic_method": "genderComputer@f626761 + first-author first-listed affiliation",
+        "demographic_method": "genderComputer@f626761 + exact first-author first-listed affiliation country",
+        "measurement_regime": {
+            "substantive_G": 4,
+            "parity_reference": 0.25,
+            "unknown_treatment": "audit/coverage state; excluded from primary parity universe",
+        },
         "KRATOS": details,
-        "citation_concentration": concentration,
+        "citation_concentration_full_corpus": concentration,
     }
     (args.output_dir / "summary.json").write_text(
         json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8"
