@@ -83,13 +83,14 @@ def _build_exact_country_lookup() -> Dict[str, str]:
             if key:
                 lookup[key] = iso3
 
-    # Common Scopus variants not always represented as short/official names.
+    # Common exact Scopus variants not always represented as short/official names.
     lookup.update(
         {
             "macao": "MAC",
             "macao sar": "MAC",
             "viet nam": "VNM",
             "türkiye": "TUR",
+            "turkey": "TUR",
         }
     )
     return lookup
