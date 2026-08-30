@@ -103,8 +103,8 @@ def extract_first_author_affiliation(authors_with_affiliations: object) -> str:
 
     Scopus separates author blocks with semicolons. If a first author has more
     than one affiliation, all of those affiliations may occur inside this block;
-    country resolution below therefore takes the first recognised country from
-    left to right, i.e. the first listed affiliation.
+    country resolution below therefore takes the first explicit country from
+    left to right, i.e. the country terminating the first listed affiliation.
     """
     if not isinstance(authors_with_affiliations, str) or not authors_with_affiliations.strip():
         return ""
@@ -130,15 +130,45 @@ def _country_to_iso3(candidate: str) -> Optional[str]:
     return result if re.fullmatch(r"[A-Z]{3}", result) else None
 
 
+def _explicit_country_tokens(first_author_block: str) -> Sequence[str]:
+    """Return conservative country candidates from a Scopus author block.
+
+    Scopus formats an author-affiliation block as ``Surname, Given names, ...``.
+    The first two comma-delimited components are therefore author-name material
+    and must never be interpreted as geography. Short alphabetic tokens are also
+    rejected because country-converter may treat name fragments or regional
+    abbreviations such as ``Lu``, ``Li``, ``Pan`` or ``CH`` as countries.
+
+    The resolver deliberately prefers ``unknown`` to a forced country when an
+    explicit country-name token cannot be identified.
+    """
+    parts = [part.strip() for part in first_author_block.split(",") if part.strip()]
+    affiliation_parts = parts[2:] if len(parts) >= 3 else []
+
+    candidates = []
+    for token in affiliation_parts:
+        cleaned = re.sub(r"\s+", " ", token).strip(" .")
+        letters = re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿĀ-ſ]", "", cleaned)
+        if len(letters) < 4:
+            continue
+        if re.fullmatch(r"[A-Z]{2,3}", cleaned):
+            continue
+        candidates.append(cleaned)
+    return candidates
+
+
 def resolve_first_author_country(authors_with_affiliations: object) -> Tuple[str, str, str]:
-    """Resolve first-listed first-author country to (country, ISO3, method)."""
+    """Resolve first-listed first-author country to (country, ISO3, method).
+
+    Only the first author's block is inspected. Author-name components and short
+    code-like tokens are excluded before country conversion; the first remaining
+    explicit country-name token wins. Unresolved records remain ``unknown``.
+    """
     block = extract_first_author_affiliation(authors_with_affiliations)
     if not block:
         return "unknown", "unknown", "first_author_affiliation_unresolved"
 
-    # The first comma-delimited items are normally author/institution/city; the
-    # first token recognised as a country identifies the first listed affiliation.
-    for token in [part.strip() for part in block.split(",") if part.strip()]:
+    for token in _explicit_country_tokens(block):
         iso3 = _country_to_iso3(token)
         if iso3:
             canonical = _CC.convert(names=iso3, to="name_short", not_found=token)
