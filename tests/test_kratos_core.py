@@ -89,6 +89,17 @@ def test_central_macedonia_is_not_forced_to_north_macedonia():
     assert iso3 == "unknown"
 
 
+def test_scopus_turkey_alias_resolves_to_turkiye_iso3():
+    value = (
+        "Kozak, Nazmi, School of Tourism and Hotel Management, Anadolu Üniversitesi, "
+        "Eskisehir, Turkey; Kayar, Çaǧil Hale, School of Tourism and Hotel Management, "
+        "Anadolu Üniversitesi, Eskisehir, Turkey"
+    )
+    _, iso3, method = resolve_first_author_country(value)
+    assert iso3 == "TUR"
+    assert method == "first_author_first_listed_affiliation_exact_country"
+
+
 def test_short_country_code_like_tokens_are_not_forced():
     value = "Doe, Alex, Research Unit, ZZ"
     country, iso3, method = resolve_first_author_country(value)
