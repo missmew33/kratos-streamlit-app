@@ -24,7 +24,15 @@ import pandas as pd
 from kratos_core import compute_kratos_fixed_g
 
 
-METRICS = ["demographic_coverage", "H_prime", "W_norm", "KCDI", "P", "R", "KJI"]
+METRICS = [
+    "demographic_coverage",
+    "H_D_prime",
+    "H_C_prime",
+    "KCDI",
+    "P",
+    "R",
+    "KJI",
+]
 
 
 def summarise(draws: pd.DataFrame) -> pd.DataFrame:
@@ -123,7 +131,7 @@ def main() -> None:
     parser.add_argument("--year-max", type=int, default=2025)
     parser.add_argument("--matched-n", type=int, default=None)
     parser.add_argument("--B", type=int, default=1000)
-    parser.add_argument("--seed", type=int, default=20260830)
+    parser.add_argument("--seed", type=int, default=20260831)
     args = parser.parse_args()
 
     df = pd.read_csv(args.audit_csv)
