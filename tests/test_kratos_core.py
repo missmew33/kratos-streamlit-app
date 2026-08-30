@@ -2,6 +2,7 @@ import pandas as pd
 
 from kratos_core import (
     ALL_GROUPS,
+    G,
     compute_kratos_fixed_g,
     extract_first_author,
     extract_given_name,
@@ -24,7 +25,7 @@ def test_first_listed_first_author_affiliation_wins():
     )
     country, iso3, method = resolve_first_author_country(value)
     assert iso3 == "GBR"
-    assert method == "first_author_first_listed_affiliation"
+    assert method == "first_author_first_listed_affiliation_exact_country"
     assert country != "Portugal"
 
 
@@ -67,6 +68,27 @@ def test_affiliation_region_code_ch_is_not_switzerland():
     assert iso3 == "ITA"
 
 
+def test_fuzzy_place_name_bengbu_is_not_united_kingdom():
+    value = "Doe, Alex, Research Institute, Bengbu"
+    country, iso3, method = resolve_first_author_country(value)
+    assert country == "unknown"
+    assert iso3 == "unknown"
+    assert method == "first_author_affiliation_unresolved"
+
+
+def test_bengbu_followed_by_explicit_china_resolves_china():
+    value = "Doe, Alex, Research Institute, Bengbu, China"
+    _, iso3, _ = resolve_first_author_country(value)
+    assert iso3 == "CHN"
+
+
+def test_central_macedonia_is_not_forced_to_north_macedonia():
+    value = "Doe, Alex, Research Institute, Central Macedonia"
+    country, iso3, _ = resolve_first_author_country(value)
+    assert country == "unknown"
+    assert iso3 == "unknown"
+
+
 def test_short_country_code_like_tokens_are_not_forced():
     value = "Doe, Alex, Research Unit, ZZ"
     country, iso3, method = resolve_first_author_country(value)
@@ -75,7 +97,7 @@ def test_short_country_code_like_tokens_are_not_forced():
     assert method == "first_author_affiliation_unresolved"
 
 
-def test_fixed_g_retains_all_nine_cells_and_kji_is_bounded():
+def test_fixed_g4_retains_four_substantive_cells_and_excludes_unknown_from_parity():
     df = pd.DataFrame(
         {
             "group": [
@@ -89,14 +111,33 @@ def test_fixed_g_retains_all_nine_cells_and_kji_is_bounded():
     )
     groups, details = compute_kratos_fixed_g(df)
     assert list(groups["Group"]) == list(ALL_GROUPS)
-    assert len(groups) == 9
-    assert details["G"] == 9
-    assert abs(details["p_star"] - (1 / 9)) < 1e-12
+    assert len(groups) == 4
+    assert G == 4
+    assert details["G"] == 4
+    assert abs(details["p_star"] - 0.25) < 1e-12
+    assert details["n_docs_input"] == 4
+    assert details["n_docs_resolved"] == 3
+    assert abs(details["demographic_coverage"] - 0.75) < 1e-12
     assert 0 <= details["KJI"] <= details["KCDI"] <= 1
     assert abs(details["R"] - (1 - details["P"])) < 1e-12
 
 
-def test_empty_cells_are_not_dropped_from_entropy_reference():
+def test_unknown_only_records_do_not_create_substantive_parity_cell():
+    df = pd.DataFrame(
+        {
+            "group": ["unknown x Global North", "female x unknown"],
+            "Cited by": [10, 5],
+        }
+    )
+    groups, details = compute_kratos_fixed_g(df)
+    assert len(groups) == 4
+    assert details["n_docs_resolved"] == 0
+    assert details["demographic_coverage"] == 0
+    assert details["KCDI"] == 0
+    assert details["KJI"] == 0
+
+
+def test_empty_substantive_cells_are_not_dropped_from_entropy_reference():
     df = pd.DataFrame(
         {
             "group": ["female x Global North"] * 5,
@@ -104,6 +145,6 @@ def test_empty_cells_are_not_dropped_from_entropy_reference():
         }
     )
     groups, details = compute_kratos_fixed_g(df)
-    assert len(groups) == 9
+    assert len(groups) == 4
     assert details["H_prime"] == 0.0
-    assert (groups["n_docs"] == 0).sum() == 8
+    assert (groups["n_docs"] == 0).sum() == 3
