@@ -23,9 +23,23 @@ This branch replaces the legacy `gender-guesser` enrichment path with an auditab
 
 The exact-country rule was regression-checked against the manually audited canonical Trade Fairs/MICE corpus (`N=101`), reproducing its validated geography distribution: Global North=62, Global South=38, unknown=1. Additional regression cases ensure that affiliation/location fragments are not converted into countries.
 
+## Primary analysis and unresolved-metadata sensitivity
+
+The primary KRATOS comparison is complete-case with respect to the four substantive demographic cells. Every corpus must therefore report both `n_docs_input` and `demographic_coverage` alongside KCDI, P, R, and KJI.
+
+Unresolved gender is assessed through **stratified stochastic sensitivity analysis**. For records with known Global North/Global South geography but unresolved gender, female/male assignments are drawn according to the observed resolved-gender distribution within the same region and corpus. Geography-unknown records remain unresolved. The default sensitivity analysis uses `B=1000` draws and reports the median and empirical 2.5th/97.5th percentiles.
+
+This procedure is not interpreted as recovering an author's true or self-identified gender. It is a measurement-sensitivity scenario used to test whether substantive cross-corpus comparisons depend on unresolved metadata.
+
+**Interpretation rule:** cross-corpus ordering is not treated as robust when it changes materially between the complete-case analysis and reasonable unresolved-gender sensitivity scenarios. In that case, the result is reported as measurement-sensitive rather than converted into a categorical ranking or epistemic-regime classification.
+
+Matched-size robustness samples documents before demographic filtering and then recomputes G=4 KRATOS, so demographic coverage remains part of each resampled diagnostic. The harmonised common-window anchor is `n=92` for 2010--2025; the full-window anchor is `n=101` for 2006--2025. The default number of draws is `B=1000`.
+
 ## Implementation
 
 `kratos_core.py` provides first-author parsing; exact first-listed affiliation country resolution; ISO3/region classification; replaceable `GenderResolver`; conservative `GenderComputerResolver`; record-level audit metadata; substantive fixed-G=4 KCDI/KJI; demographic coverage; and document-level concentration metrics.
+
+`scripts/kratos_g4_sensitivity.py` implements the unresolved-gender and matched-size sensitivity procedures without requiring licensed source records to be stored in the public repository.
 
 The primary KRATOS calculation uses complete demographic cases for the four substantive cells. Citation concentration remains a full-corpus document-level diagnostic because it does not require demographic attribution.
 
@@ -42,7 +56,8 @@ The primary KRATOS calculation uses complete demographic cases for the four subs
 - [x] unknown separated as audit/coverage state
 - [x] regression tests
 - [x] canonical MICE geography validation
-- [x] four-corpus provisional execution and coverage audit
+- [x] four-corpus G=4 execution and coverage audit
+- [x] G=4 common-window and matched-size sensitivity outputs
+- [x] unresolved-gender sensitivity procedure and interpretation rule
 - [ ] integrate into production `app.py`
-- [ ] freeze final four-corpus results after sensitivity analysis
 - [ ] freeze manuscript snapshot/version/hash
