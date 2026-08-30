@@ -33,7 +33,7 @@ jobs:
           mkdir -p dependency_bundle
           python -m pip install --no-deps --target dependency_bundle country-converter
           python -m pip install --no-deps --target dependency_bundle 'genderComputer @ git+https://github.com/tue-mdse/genderComputer.git@f6267615517913e53cb0b882b248f1c2e11b8bbc'
-          python -m pip install --no-deps --target dependency_bundle python-nameparser Unidecode
+          python -m pip install --no-deps --target dependency_bundle nameparser Unidecode
       - name: Upload dependency bundle
         uses: actions/upload-artifact@v4
         with:
