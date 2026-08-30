@@ -28,6 +28,53 @@ def test_first_listed_first_author_affiliation_wins():
     assert country != "Portugal"
 
 
+def test_author_surname_lu_is_not_luxembourg():
+    value = (
+        "Lu, Ying (Tracy), School of Human Environmental Sciences, "
+        "University of Kentucky, Lexington, United States; Cai, Liping A., "
+        "College of Health and Human Sciences, West Lafayette, United States"
+    )
+    _, iso3, _ = resolve_first_author_country(value)
+    assert iso3 == "USA"
+
+
+def test_author_surname_pan_is_not_panama():
+    value = (
+        "Pan, Mengchuan, Department of Marketing, National Chung Hsing University, "
+        "Taichung, Taiwan; Lee, Tzong Ru, Department of Marketing, "
+        "National Chung Hsing University, Taichung, Taiwan"
+    )
+    _, iso3, _ = resolve_first_author_country(value)
+    assert iso3 == "TWN"
+
+
+def test_author_surname_li_is_not_liechtenstein():
+    value = (
+        "Li, Mengyuan, School of Management, Zhejiang University, Hangzhou, China; "
+        "Wang, Wei, School of Business, Beijing, China"
+    )
+    _, iso3, _ = resolve_first_author_country(value)
+    assert iso3 == "CHN"
+
+
+def test_affiliation_region_code_ch_is_not_switzerland():
+    value = (
+        "Iacuone, Silvia, Department of Economic Studies, University of G. d'Annunzio "
+        "Chieti and Pescara, Chieti, CH, Italy; Zarrilli, Luca, Department of Economic "
+        "Studies, University of G. d'Annunzio Chieti and Pescara, Chieti, CH, Italy"
+    )
+    _, iso3, _ = resolve_first_author_country(value)
+    assert iso3 == "ITA"
+
+
+def test_short_country_code_like_tokens_are_not_forced():
+    value = "Doe, Alex, Research Unit, ZZ"
+    country, iso3, method = resolve_first_author_country(value)
+    assert country == "unknown"
+    assert iso3 == "unknown"
+    assert method == "first_author_affiliation_unresolved"
+
+
 def test_fixed_g_retains_all_nine_cells_and_kji_is_bounded():
     df = pd.DataFrame(
         {
