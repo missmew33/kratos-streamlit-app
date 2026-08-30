@@ -1,16 +1,18 @@
 """Pure computational core for KRATOS.
 
 This module separates demographic metadata resolution from the Streamlit UI and
-implements the fixed nine-cell Gender x Region measurement regime used by the
-Scientometrics revision.
+implements the substantive four-cell Gender x Region measurement regime used by
+the Scientometrics revision.
 
 Design principles
 -----------------
 * one document is attributed to one first-author cell;
 * geography is resolved from the first listed affiliation of the first author;
 * name-based gender is a metadata proxy, never self-identified gender;
-* ambiguous/unresolved classifications remain ``unknown``;
-* the analytical universe is always G=9, including empty cells;
+* ambiguous/unresolved classifications remain ``unknown`` audit states;
+* the substantive analytical universe is G=4: female/male x Global North/South;
+* unresolved metadata are excluded from parity expectations and reported as
+  measurement coverage rather than treated as substantive demographic groups;
 * KJI <= KCDI is an architectural property, not an empirical test.
 """
 
@@ -26,15 +28,25 @@ import numpy as np
 import pandas as pd
 
 
+# Audit states preserved in record-level outputs.
 GENDER_STATES: Tuple[str, ...] = ("female", "male", "unknown")
 REGION_STATES: Tuple[str, ...] = ("Global North", "Global South", "unknown")
-ALL_GROUPS: Tuple[str, ...] = tuple(
+AUDIT_GROUPS: Tuple[str, ...] = tuple(
     f"{gender} x {region}" for gender in GENDER_STATES for region in REGION_STATES
+)
+
+# Substantive measurement universe. Unknown is measurement uncertainty, not a
+# demographic category with its own parity expectation.
+SUBSTANTIVE_GENDER_STATES: Tuple[str, ...] = ("female", "male")
+SUBSTANTIVE_REGION_STATES: Tuple[str, ...] = ("Global North", "Global South")
+ALL_GROUPS: Tuple[str, ...] = tuple(
+    f"{gender} x {region}"
+    for gender in SUBSTANTIVE_GENDER_STATES
+    for region in SUBSTANTIVE_REGION_STATES
 )
 G = len(ALL_GROUPS)
 
-# Canonical KRATOS v2.1.0 set. Note that the executable constant contains 39
-# ISO3 codes although an earlier manuscript draft described it as 38.
+# Canonical KRATOS v2.1.0 set. The executable constant contains 39 ISO3 codes.
 GLOBAL_NORTH_ISO3 = frozenset(
     {
         "USA", "CAN", "GBR", "FRA", "DEU", "ITA", "ESP", "NLD", "BEL", "LUX",
@@ -45,6 +57,45 @@ GLOBAL_NORTH_ISO3 = frozenset(
 )
 
 _CC = coco.CountryConverter()
+
+
+def _normalise_country_name(value: object) -> str:
+    if value is None or pd.isna(value):
+        return ""
+    text = re.sub(r"\s+", " ", str(value)).strip(" .")
+    return text.casefold()
+
+
+def _build_exact_country_lookup() -> Dict[str, str]:
+    """Build an exact country-name lookup from country-converter metadata.
+
+    Only exact short/official names are admitted. The library's permissive regex
+    aliases are deliberately not used because they can map place names such as
+    ``Bengbu`` or ``Ningbo`` to unrelated countries.
+    """
+    lookup: Dict[str, str] = {}
+    for _, row in _CC.data.iterrows():
+        iso3 = str(row.get("ISO3", "") or "").strip()
+        if not re.fullmatch(r"[A-Z]{3}", iso3):
+            continue
+        for column in ("name_short", "name_official"):
+            key = _normalise_country_name(row.get(column))
+            if key:
+                lookup[key] = iso3
+
+    # Common Scopus variants not always represented as short/official names.
+    lookup.update(
+        {
+            "macao": "MAC",
+            "macao sar": "MAC",
+            "viet nam": "VNM",
+            "türkiye": "TUR",
+        }
+    )
+    return lookup
+
+
+_EXACT_COUNTRY_TO_ISO3 = _build_exact_country_lookup()
 
 
 class GenderResolver(Protocol):
@@ -103,8 +154,8 @@ def extract_first_author_affiliation(authors_with_affiliations: object) -> str:
 
     Scopus separates author blocks with semicolons. If a first author has more
     than one affiliation, all of those affiliations may occur inside this block;
-    country resolution below therefore takes the first explicit country from
-    left to right, i.e. the country terminating the first listed affiliation.
+    country resolution therefore takes the first exact country-name token from
+    left to right.
     """
     if not isinstance(authors_with_affiliations, str) or not authors_with_affiliations.strip():
         return ""
@@ -112,35 +163,18 @@ def extract_first_author_affiliation(authors_with_affiliations: object) -> str:
 
 
 def _country_to_iso3(candidate: str) -> Optional[str]:
-    if not candidate:
-        return None
-    try:
-        result = _CC.convert(names=candidate.strip(), to="ISO3", not_found=None)
-    except Exception:
-        return None
-    if result is None:
-        return None
-    if isinstance(result, (list, tuple, np.ndarray)):
-        result = result[0] if len(result) else None
-    if result is None:
-        return None
-    result = str(result).strip()
-    if result in {"", "not found", candidate.strip()}:
-        return None
-    return result if re.fullmatch(r"[A-Z]{3}", result) else None
+    """Resolve only exact country names; never fuzzy location/name fragments."""
+    key = _normalise_country_name(candidate)
+    return _EXACT_COUNTRY_TO_ISO3.get(key)
 
 
 def _explicit_country_tokens(first_author_block: str) -> Sequence[str]:
     """Return conservative country candidates from a Scopus author block.
 
     Scopus formats an author-affiliation block as ``Surname, Given names, ...``.
-    The first two comma-delimited components are therefore author-name material
-    and must never be interpreted as geography. Short alphabetic tokens are also
-    rejected because country-converter may treat name fragments or regional
-    abbreviations such as ``Lu``, ``Li``, ``Pan`` or ``CH`` as countries.
-
-    The resolver deliberately prefers ``unknown`` to a forced country when an
-    explicit country-name token cannot be identified.
+    The first two comma-delimited components are author-name material and are
+    excluded. Short code-like tokens are also rejected. Remaining tokens are
+    considered only if they exactly match a recognised country name.
     """
     parts = [part.strip() for part in first_author_block.split(",") if part.strip()]
     affiliation_parts = parts[2:] if len(parts) >= 3 else []
@@ -160,9 +194,9 @@ def _explicit_country_tokens(first_author_block: str) -> Sequence[str]:
 def resolve_first_author_country(authors_with_affiliations: object) -> Tuple[str, str, str]:
     """Resolve first-listed first-author country to (country, ISO3, method).
 
-    Only the first author's block is inspected. Author-name components and short
-    code-like tokens are excluded before country conversion; the first remaining
-    explicit country-name token wins. Unresolved records remain ``unknown``.
+    Only the first author's block is inspected. A token is accepted only when it
+    exactly matches a recognised country name. This deliberately prefers
+    ``unknown`` to fuzzy country inference.
     """
     block = extract_first_author_affiliation(authors_with_affiliations)
     if not block:
@@ -172,7 +206,7 @@ def resolve_first_author_country(authors_with_affiliations: object) -> Tuple[str
         iso3 = _country_to_iso3(token)
         if iso3:
             canonical = _CC.convert(names=iso3, to="name_short", not_found=token)
-            return str(canonical), iso3, "first_author_first_listed_affiliation"
+            return str(canonical), iso3, "first_author_first_listed_affiliation_exact_country"
 
     return "unknown", "unknown", "first_author_affiliation_unresolved"
 
@@ -217,8 +251,6 @@ class GenderComputerResolver:
         try:
             raw = self._resolver.resolveGender(query_name, location)
         except Exception:
-            # Some country strings are unsupported even after country_converter.
-            # Retry without location rather than forcing a category.
             try:
                 raw = self._resolver.resolveGender(query_name, None)
                 location = None
@@ -310,7 +342,7 @@ def _complete_group_series(series: pd.Series, values: Sequence[str]) -> pd.Serie
 
 
 def compute_shannon_entropy_fixed(group_counts: Mapping[str, float]) -> float:
-    """Normalised Shannon entropy using the predefined G=9 denominator."""
+    """Normalised Shannon entropy over the fixed substantive G=4 universe."""
     total = float(sum(group_counts.get(group, 0.0) for group in ALL_GROUPS))
     if total <= 0:
         return 0.0
@@ -324,9 +356,9 @@ def compute_shannon_entropy_fixed(group_counts: Mapping[str, float]) -> float:
 
 
 def compute_weight_normalization_fixed(group_weights: Mapping[str, float]) -> float:
-    """Range-normalise group citation totals across all nine predefined cells."""
+    """Range-normalise group citation totals across the four substantive cells."""
     values = np.array([float(group_weights.get(group, 0.0)) for group in ALL_GROUPS], dtype=float)
-    if values.size == 0:
+    if values.size == 0 or np.all(values == 0.0):
         return 0.0
     w_min = float(values.min())
     w_max = float(values.max())
@@ -341,9 +373,12 @@ def compute_kratos_fixed_g(
     weight_col: str = "Cited by",
     lambda_param: float = 0.5,
 ) -> Tuple[pd.DataFrame, Dict[str, float]]:
-    """Compute revised corpus/group KRATOS quantities with fixed G=9.
+    """Compute corpus/group KRATOS quantities with substantive fixed G=4.
 
-    Returns a nine-row group table and corpus-level details. Empty cells are
+    Only records with resolved female/male gender and Global North/Global South
+    geography enter the parity calculation. Unresolved records remain in the
+    record-level audit and are reflected in ``demographic_coverage``; they are
+    not assigned an artificial parity target. Empty substantive cells are
     retained. ``KJI <= KCDI`` follows by construction because P=mean(A*S) <= 1.
     """
     if group_col not in df.columns:
@@ -353,8 +388,10 @@ def compute_kratos_fixed_g(
     if not 0.0 <= lambda_param <= 1.0:
         raise ValueError("lambda_param must lie in [0, 1]")
 
-    work = df[[group_col, weight_col]].copy()
-    work[group_col] = work[group_col].where(work[group_col].isin(ALL_GROUPS), "unknown x unknown")
+    input_work = df[[group_col, weight_col]].copy()
+    n_input = int(len(input_work))
+
+    work = input_work[input_work[group_col].isin(ALL_GROUPS)].copy()
     work[weight_col] = pd.to_numeric(work[weight_col], errors="coerce").fillna(0.0).clip(lower=0.0)
 
     n_total = int(len(work))
@@ -365,7 +402,11 @@ def compute_kratos_fixed_g(
 
     h_prime = compute_shannon_entropy_fixed(counts.to_dict())
     w_norm = compute_weight_normalization_fixed(weights.to_dict())
-    kcdi = float((h_prime ** lambda_param) * (w_norm ** (1.0 - lambda_param)))
+    kcdi = (
+        float((h_prime ** lambda_param) * (w_norm ** (1.0 - lambda_param)))
+        if n_total > 0
+        else 0.0
+    )
 
     p_star = 1.0 / G
     rows = []
@@ -399,7 +440,10 @@ def compute_kratos_fixed_g(
     details = {
         "G": float(G),
         "p_star": p_star,
+        "n_docs_input": float(n_input),
         "n_docs": float(n_total),
+        "n_docs_resolved": float(n_total),
+        "demographic_coverage": (float(n_total / n_input) if n_input else 0.0),
         "total_weight": total_weight,
         "H_prime": h_prime,
         "W_norm": w_norm,
@@ -414,6 +458,7 @@ def compute_kratos_fixed_g(
 
 
 def compute_citation_concentration(weights: Iterable[object]) -> Dict[str, float]:
+    """Document-level citation concentration, independent of demographic coverage."""
     values = pd.to_numeric(pd.Series(list(weights)), errors="coerce").fillna(0.0).clip(lower=0.0)
     n = int(len(values))
     total = float(values.sum())
