@@ -5,6 +5,12 @@ metadata enrichment and variable-G metric functions with the auditable pure
 implementation in ``kratos_core.py``. The substantive measurement universe is
 G=4 (female/male x Global North/South); unresolved metadata remain audit states
 and are reported through demographic coverage.
+
+KCDI now combines normalised document-distribution entropy (H_D_prime) and
+normalised citation-distribution entropy (H_C_prime). The legacy UI still expects
+``H_prime`` and ``W_norm`` dictionary keys; temporary aliases are supplied only
+for UI compatibility on this release-candidate branch. They must not be used in
+reproducibility exports or manuscript reporting.
 """
 
 from io import BytesIO
@@ -30,7 +36,7 @@ from kratos_core import (
 )
 
 
-legacy.APP_VERSION = "2.2.0-rc2"
+legacy.APP_VERSION = "2.2.0-rc3-hc"
 legacy.GLOBAL_NORTH = set(GLOBAL_NORTH_ISO3)
 legacy.DEFAULT_COLUMNS = {
     "author": [
@@ -240,8 +246,11 @@ def compute_kcdi_corpus_v2(
 ):
     _, details = compute_kratos_fixed_g(df, group_col, weight_col, lambda_param)
     return details["KCDI"], {
-        "H_prime": details["H_prime"],
-        "W_norm": details["W_norm"],
+        "H_D_prime": details["H_D_prime"],
+        "H_C_prime": details["H_C_prime"],
+        # Temporary aliases required by the legacy Streamlit renderer.
+        "H_prime": details["H_D_prime"],
+        "W_norm": details["H_C_prime"],
         "n_groups": len(ALL_GROUPS),
         "lambda": details["lambda"],
         "KCDI_corpus": details["KCDI"],
@@ -284,8 +293,11 @@ def compute_corpus_kji_v2(
 ):
     groups, details = compute_kratos_fixed_g(df, group_col, weight_col, lambda_param)
     return details["KJI"], {
-        "H_prime": details["H_prime"],
-        "W_norm": details["W_norm"],
+        "H_D_prime": details["H_D_prime"],
+        "H_C_prime": details["H_C_prime"],
+        # Temporary aliases required by the legacy Streamlit renderer.
+        "H_prime": details["H_D_prime"],
+        "W_norm": details["H_C_prime"],
         "n_groups": len(ALL_GROUPS),
         "lambda": details["lambda"],
         "KCDI_corpus": details["KCDI"],
@@ -318,7 +330,12 @@ def generate_snapshot_export_v2(
             "gender_method": "genderComputer@f626761; conservative unknown",
             "gender_interpretation": "metadata-derived proxy, not self-identified gender",
             "unknown_treatment": "audit/coverage state; excluded from primary parity universe",
+            "kcdi_identity": "KCDI = H_D_prime^lambda * H_C_prime^(1-lambda)",
+            "document_component": "H_D_prime = normalised Shannon entropy of resolved document shares over fixed G=4",
+            "citation_component": "H_C_prime = normalised Shannon entropy of resolved citation shares over fixed G=4",
             "kji_identity": "KJI = KCDI * mean(A*S)",
+            "delta_interpretation": "derived identity KCDI-KJI = KCDI*(1-P), not an empirical test",
+            "legacy_ui_aliases": "H_prime->H_D_prime and W_norm->H_C_prime are temporary renderer aliases only",
         },
         "column_mappings": column_mappings,
         "global_north_hash": legacy.compute_global_north_hash(),
