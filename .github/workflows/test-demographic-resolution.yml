@@ -1,8 +1,9 @@
-name: demographic-resolution-v2 tests
+name: KRATOS v2.3 tests
 
 on:
   push:
     branches:
+      - main
       - method/demographic-resolution-v2
   pull_request:
     branches:
@@ -23,7 +24,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
       - name: Compile Python sources
-        run: python -m compileall -q app.py app_v2_2.py kratos_core.py scripts tests
+        run: |
+          python -m compileall -q \
+            app.py app_v2_2.py kratos_core.py kratos_diagnostics.py \
+            pages scripts tests
       - name: Run tests
         env:
           PYTHONPATH: ${{ github.workspace }}
