@@ -26,7 +26,8 @@ jobs:
       - name: Compile Python sources
         run: |
           python -m compileall -q \
-            app.py app_v2_2.py kratos_core.py kratos_diagnostics.py \
+            app.py app_v2_2.py app_v2_3.py \
+            kratos_core.py kratos_diagnostics.py \
             pages scripts tests
       - name: Run tests
         env:
