@@ -83,10 +83,11 @@ streamlit run app_v2_2.py
 
 - `scripts/kratos_analyze_csv.py`: record-level demographic audit, G=4 group metrics, corpus snapshot, and full-corpus citation concentration.
 - `scripts/kratos_g4_sensitivity.py`: unresolved-gender sensitivity and matched-size resampling.
+- `scripts/kratos_null_baseline.py`: size- and composition-conditional permutation calibration. It preserves the resolved-set size, G=4 group composition, and empirical citation-count distribution while permuting citations across resolved documents, and reports observed values against corpus-specific null distributions for `H_C_prime`, `KCDI`, `P`, and `KJI`.
 - `tests/`: regression tests for geography resolution, fixed G=4 treatment, citation entropy, KCDI boundary behaviour, KJI architecture, and production-app startup.
 
-The default stochastic sensitivity seed is `20260831`; manuscript analyses should record the exact seed, draw count, input hashes, and software revision used for the frozen results.
+The default stochastic sensitivity seed is `20260831`; manuscript analyses should record the exact seed, draw count, input hashes, and software revision used for the frozen results. The permutation calibration defaults to `B=5000` draws.
 
 ## Interpretation
 
-KRATOS is a **recognition-comparability diagnostic**. Corpus-level values should not be read as direct rankings of epistemic justice. Cross-corpus interpretation requires the accompanying common-window, matched-size, parameter, and unresolved-metadata sensitivity analyses.
+KRATOS is a **recognition-comparability diagnostic**. Corpus-level values should not be read as direct rankings of epistemic justice. Cross-corpus interpretation should consider the accompanying corpus-conditional null calibration, common-window, matched-size, parameter, and unresolved-metadata sensitivity analyses.
