@@ -232,6 +232,7 @@ def summarise_permutation_null(
         p025 = float(values.quantile(0.025))
         p975 = float(values.quantile(0.975))
         median = float(values.median())
+        tie_share = float(np.mean(np.isclose(values.to_numpy(dtype=float), obs, rtol=1e-12, atol=1e-12)))
 
         if obs < p025:
             position = "below 95% null range"
@@ -250,6 +251,7 @@ def summarise_permutation_null(
                 "observed_minus_null_median": obs - median,
                 "lower_tail_mc_p": (lower_count + 1) / (len(values) + 1),
                 "upper_tail_mc_p": (upper_count + 1) / (len(values) + 1),
+                "tie_share": tie_share,
                 "null_position": position,
             }
         )
