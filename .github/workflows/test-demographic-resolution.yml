@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - method/demographic-resolution-v2
+      - m5-final-20260914
   pull_request:
     branches:
       - main
@@ -16,8 +17,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.12.14'
           cache: 'pip'
+      - name: Report runtime
+        run: python --version
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
