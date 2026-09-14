@@ -1,14 +1,15 @@
 """Interactive robustness diagnostics for KRATOS v2.3.
 
-This Streamlit page adds resolved-set permutation null calibration and
+This Streamlit page exposes the global resolved-set permutation baseline and
 composition diagnostics without changing the primary KRATOS measurement
-architecture implemented in ``app.py`` and ``kratos_core.py``.
+architecture implemented in ``app.py`` and ``kratos_core.py``. The archived M5
+workflow additionally includes biennium- and exact-year conditioning and design-
+resolution assessment through ``kratos_diagnostics.py``.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from io import BytesIO
 import json
 
 import pandas as pd
@@ -26,8 +27,8 @@ from kratos_diagnostics import (
 st.set_page_config(page_title="KRATOS robustness", page_icon="K", layout="wide")
 st.title("KRATOS robustness diagnostics")
 st.caption(
-    "Resolved-set null calibration and composition diagnostics for the fixed G=4 regime. "
-    "These diagnostics supplement, but do not replace, the primary KCDI/P/KJI estimates."
+    "Resolved-set global null calibration and composition diagnostics for the fixed G=4 regime. "
+    "The Scientometrics M5 release uses B=50,000 for the principal global, biennium, and exact-year calibrations."
 )
 
 with st.sidebar:
@@ -41,9 +42,12 @@ with st.sidebar:
     )
     B = st.select_slider(
         "Permutation draws",
-        options=[500, 1000, 2500, 5000, 10000],
-        value=5000,
-        help="Scientometrics manuscript specification: 5,000 draws.",
+        options=[500, 1000, 5000, 10000, 50000],
+        value=50000,
+        help=(
+            "Locked Scientometrics manuscript specification: 50,000 draws. "
+            "Lower values are exploratory only."
+        ),
     )
     seed = st.number_input(
         "Random seed",
@@ -184,9 +188,13 @@ for upload in uploads:
         "observed_minus_null_median",
         "lower_tail_mc_p",
         "upper_tail_mc_p",
+        "null_sd",
+        "null_z",
+        "tie_share",
     ]
     for col in numeric:
-        display[col] = pd.to_numeric(display[col], errors="coerce").round(4)
+        if col in display.columns:
+            display[col] = pd.to_numeric(display[col], errors="coerce").round(4)
     st.dataframe(display, use_container_width=True, hide_index=True)
 
     p_row = summary.loc[summary["metric"] == "P"].iloc[0]
