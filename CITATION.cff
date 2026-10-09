@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use KRATOS, please cite the archived Zenodo software record."
+title: "Before Measuring Epistemic Change: KRATOS as a Bibliometric Diagnostic of Recognition Comparability"
+type: software
+authors:
+  - family-names: "González-Barbado"
+    given-names: "María Dolores"
+  - family-names: "Barbado González"
+    given-names: "Alberto"
+version: "2.3"
+doi: "10.5281/zenodo.23082982"
+repository-code: "https://github.com/missmew33/kratos-streamlit-app"
+license: MIT
