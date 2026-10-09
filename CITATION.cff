@@ -8,7 +8,7 @@ authors:
   - family-names: "Barbado González"
     given-names: "Alberto"
 version: "2.3"
-doi: "10.5281/zenodo.23263510"
+doi: "10.5281/zenodo.23267406"
 repository-code: "https://github.com/missmew33/kratos-streamlit-app"
 license: MIT
 date-released: "2026-10-09"
