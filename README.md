@@ -124,7 +124,7 @@ streamlit run app_v2_2.py
 - `pages/2_Robustness_diagnostics.py`: interactive multi-corpus robustness page with downloadable null summaries, permutation draws, and reproducibility snapshot.
 - `tests/`: regression tests for geography resolution, fixed G=4 treatment, citation entropy, KCDI boundary behaviour, KJI architecture, resolved-set permutation calibration, and production-app startup.
 
-The default stochastic seed is `20260831`; manuscript analyses should record the exact seed, draw count, input hashes, and software revision used for the frozen results. The permutation calibration defaults to `B=5000` draws.
+The default stochastic seed is `20260831`; manuscript analyses should record the exact seed, draw count, input hashes, and software revision used for the frozen results. The permutation calibration defaults to `B=50,000` draws.
 
 ## Interpretation
 
