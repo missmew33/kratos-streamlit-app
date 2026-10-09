@@ -1,4 +1,4 @@
-"""Production Streamlit interface for KRATOS v2.2.
+"""Production Streamlit interface for KRATOS v2.3.
 
 The application delegates all substantive metric computation to ``kratos_core``.
 The substantive analytical universe is fixed at G=4 (female/male x Global
@@ -38,7 +38,7 @@ from kratos_core import (
     extract_given_name,
 )
 
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 _CC = coco.CountryConverter()
 
 AUTHOR_CANDIDATES = [
