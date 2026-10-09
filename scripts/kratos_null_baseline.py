@@ -19,6 +19,8 @@ from pathlib import Path
 import pandas as pd
 
 from kratos_diagnostics import (
+    PRIMARY_PERMUTATION_B,
+    PRIMARY_SEED,
     composition_diagnostics,
     null_snapshot,
     permutation_null_resolved,
@@ -42,8 +44,8 @@ def main() -> None:
     parser.add_argument("--year-min", type=int, default=None)
     parser.add_argument("--year-max", type=int, default=2025)
     parser.add_argument("--lambda-param", type=float, default=0.5)
-    parser.add_argument("--B", type=int, default=5000)
-    parser.add_argument("--seed", type=int, default=20260831)
+    parser.add_argument("--B", type=int, default=PRIMARY_PERMUTATION_B)
+    parser.add_argument("--seed", type=int, default=PRIMARY_SEED)
     args = parser.parse_args()
 
     df = pd.read_csv(args.audit_csv)
