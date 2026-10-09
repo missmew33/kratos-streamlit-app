@@ -51,7 +51,7 @@ The repository's demographic-audit CSVs are automatically generated resolution a
 
 ## Archived software record
 
-The manuscript-associated KRATOS v2.3 software and reproducibility record is archived in Zenodo at DOI `10.5281/zenodo.23082982`. The live GitHub `main` branch may contain maintenance changes made after the frozen empirical release.
+The KRATOS software and reproducibility record is archived in Zenodo under concept DOI `10.5281/zenodo.22749724`; the version-specific DOI is reported in the repository citation metadata for the current archived release. The live GitHub `main` branch may contain maintenance changes made after the frozen empirical release.
 
 ## Implementation
 
