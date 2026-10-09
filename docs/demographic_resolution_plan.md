@@ -1,8 +1,8 @@
-# KRATOS demographic resolution v2
+# KRATOS demographic resolution and reproducibility specification (v2.3)
 
 ## Purpose
 
-This branch replaces the legacy `gender-guesser` enrichment path with an auditable first-author demographic-resolution layer and aligns the executable code with the revised Scientometrics measurement regime.
+This document records the demographic-resolution layer and reproducibility rules used by KRATOS v2.3. The implementation replaces the legacy `gender-guesser` enrichment path with an auditable first-author demographic-resolution layer aligned with the Scientometrics measurement regime.
 
 ## Measurement rules
 
@@ -39,13 +39,21 @@ This procedure is not interpreted as recovering an author's true or self-identif
 
 **Interpretation rule:** cross-corpus ordering is not treated as robust when it changes materially between the complete-case analysis and reasonable unresolved-gender sensitivity scenarios. In that case, the result is reported as measurement-sensitive rather than converted into a categorical ranking or epistemic-regime classification.
 
-Matched-size robustness samples documents before demographic filtering and then recomputes G=4 KRATOS, so demographic coverage remains part of each resampled diagnostic. The harmonised common-window anchor is `n=92` for 2010--2025; the full-window anchor is `n=101` for 2006--2025. The default number of draws is `B=1000`.
+Matched-size robustness samples documents before demographic filtering and then recomputes G=4 KRATOS, so demographic coverage remains part of each resampled diagnostic. The harmonised common-window anchor is `n=92` for 2010--2025; the full-window anchor is `n=101` for 2006--2025. The default number of draws is `B=1000`. With master seed `20260831`, the matched-size CLI passes `seed + 1` to the sampler, giving effective seed `20260832`; frozen outputs should record the effective seed explicitly.
+
+## Manual-audit reproducibility boundary
+
+The repository's demographic-audit CSVs are automatically generated resolution and provenance outputs. A separate stratified manual gender-proxy audit was conducted during development. Its item-selection manifest, random-number seed, and item-level manual outcomes were not preserved in the archived materials, so that manual audit cannot be exactly regenerated from the deposited code and is not treated as independently reproducible validation evidence.
+
+## Archived software record
+
+The manuscript-associated KRATOS v2.3 software and reproducibility record is archived in Zenodo at DOI `10.5281/zenodo.23082982`. The live GitHub `main` branch may contain maintenance changes made after the frozen empirical release.
 
 ## Implementation
 
 `kratos_core.py` provides first-author parsing; exact first-listed affiliation country resolution; ISO3/region classification; replaceable `GenderResolver`; conservative `GenderComputerResolver`; record-level audit metadata; substantive fixed-G=4 KCDI/KJI; demographic coverage; and document-level concentration metrics.
 
-`app.py` is the validated production Streamlit interface and uses the same `kratos_core.py` definitions. It no longer displays or computes the deprecated `W_norm` formulation. `app_v2_2.py` is retained only as a compatibility entrypoint and delegates to `app.py`.
+`app.py` is the validated KRATOS v2.3 production Streamlit interface and uses the same `kratos_core.py` definitions. It no longer displays or computes the deprecated `W_norm` formulation. `app_v2_2.py` is retained only as a compatibility entrypoint and delegates to `app.py`.
 
 `scripts/kratos_g4_sensitivity.py` implements the unresolved-gender and matched-size sensitivity procedures without requiring licensed source records to be stored in the public repository.
 
