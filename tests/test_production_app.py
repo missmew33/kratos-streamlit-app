@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_production_app_import_and_version():
     import app
 
-    assert app.APP_VERSION == "2.2.0"
+    assert app.APP_VERSION == "2.3.0"
     assert callable(app.main)
 
 
