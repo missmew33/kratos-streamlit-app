@@ -4,6 +4,14 @@ KRATOS is an auditable Python/Streamlit research instrument for examining whethe
 
 The production application is `app.py`. The computational definitions live in `kratos_core.py`. Robustness and validation diagnostics live in `kratos_diagnostics.py` and are exposed interactively through `pages/2_Robustness_diagnostics.py`.
 
+## Archived software record
+
+The manuscript-associated KRATOS v2.3 software and reproducibility record is archived in Zenodo:
+
+> González-Barbado, M.-D., & Barbado González, A. (2026). *Before Measuring Epistemic Change: KRATOS as a Bibliometric Diagnostic of Recognition Comparability* [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23082982
+
+The archived empirical release is a frozen reproducibility snapshot. The live `main` branch may contain subsequent maintenance or documentation corrections and should not be treated as byte-identical to the archived release.
+
 ## Current measurement regime
 
 The substantive analytical universe is fixed at **G=4**:
@@ -124,7 +132,9 @@ streamlit run app_v2_2.py
 - `pages/2_Robustness_diagnostics.py`: interactive multi-corpus robustness page with downloadable null summaries, permutation draws, and reproducibility snapshot.
 - `tests/`: regression tests for geography resolution, fixed G=4 treatment, citation entropy, KCDI boundary behaviour, KJI architecture, resolved-set permutation calibration, and production-app startup.
 
-The default stochastic seed is `20260831`; manuscript analyses should record the exact seed, draw count, input hashes, and software revision used for the frozen results. The permutation calibration defaults to `B=50,000` draws.
+The master stochastic seed is `20260831`. Principal permutation calibration defaults to `B=50,000` draws. The matched-size CLI deliberately passes `seed + 1` to its sampler, giving effective seed `20260832` under the manuscript default. Manuscript-grade analyses should record the effective seed, draw count, input hashes, and software revision used for each frozen output.
+
+The repository's record-level "demographic audit" files are automatically generated resolution/provenance outputs. A separate stratified manual gender-proxy audit was conducted during development, but its item-selection manifest, random-number seed, and item-level outcomes were not preserved in the archived materials; it is therefore not treated as independently reproducible validation evidence.
 
 ## Interpretation
 
