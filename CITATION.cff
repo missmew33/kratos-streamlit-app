@@ -7,7 +7,7 @@ authors:
     given-names: "María Dolores"
   - family-names: "Barbado González"
     given-names: "Alberto"
-version: "3"
+version: "2.3"
 doi: "10.5281/zenodo.23263510"
 repository-code: "https://github.com/missmew33/kratos-streamlit-app"
 license: MIT
