@@ -10,7 +10,7 @@ The manuscript-associated KRATOS v2.3 software and reproducibility record is arc
 
 > González-Barbado, M.-D., & Barbado González, A. (2026). *Before Measuring Epistemic Change: KRATOS as a Bibliometric Diagnostic of Recognition Comparability* [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23082982
 
-The archived empirical release is a frozen reproducibility snapshot. The live `main` branch may contain subsequent maintenance or documentation corrections and should not be treated as byte-identical to the archived release.
+The archived empirical release is a frozen reproducibility snapshot. Its files are under embargo until 12 December 2026; reviewer access is supplied separately through the journal submission process. The live `main` branch may contain subsequent maintenance or documentation corrections and should not be treated as byte-identical to the archived release.
 
 ## Current measurement regime
 
@@ -42,7 +42,7 @@ KJI       = KCDI * P
 
 The primary specification uses `lambda = 0.5`.
 
-`KJI <= KCDI` and `KCDI - KJI = KCDI(1-P)` are architectural identities. They are **not** empirical tests of canonical closure, epistemic stigma, or epistemic injustice.
+`KJI <= KCDI` and `KCDI - KJI = KCDI(1-P)` are architectural identities. The term *Justice* is retained only in the legacy name *KRATOS Justice Index*; KJI does not operationalise epistemic justice. These identities are **not** empirical tests of canonical closure, epistemic stigma, or epistemic injustice.
 
 ### Why `W_norm` was removed
 
