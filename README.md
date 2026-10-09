@@ -6,9 +6,11 @@ The production application is `app.py`. The computational definitions live in `k
 
 ## Archived software record
 
-The manuscript-associated KRATOS v2.3 software and reproducibility record is archived in Zenodo:
+The manuscript-associated KRATOS v2.3 software and reproducibility record is archived in Zenodo as Version 3:
 
-> González-Barbado, M.-D., & Barbado González, A. (2026). *Before Measuring Epistemic Change: KRATOS as a Bibliometric Diagnostic of Recognition Comparability* [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23082982
+> González-Barbado, M.-D., & Barbado González, A. (2026). *KRATOS v2.3: Software and Reproducibility Release* (Version 3) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23263510
+
+Concept DOI (all versions): `10.5281/zenodo.22749724`.
 
 The archived empirical release is a frozen reproducibility snapshot. Its files are under embargo until 12 December 2026; reviewer access is supplied separately through the journal submission process. The live `main` branch may contain subsequent maintenance or documentation corrections and should not be treated as byte-identical to the archived release.
 
