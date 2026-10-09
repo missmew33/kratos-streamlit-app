@@ -15,7 +15,7 @@ This document records the demographic-resolution layer and reproducibility rules
 7. **Interpretation:** `unknown` is a metadata-resolution state, not a substantive demographic category and not self-identified gender.
 8. **Primary analytical universe:** fixed **G=4** = female/male × Global North/Global South. Empty substantive cells remain.
 9. **Parity reference:** `p*=1/4`.
-10. **Coverage rule:** records with unresolved gender or geography remain in the audit trail but do not enter the G=4 parity calculation. Demographic coverage is reported for every corpus.
+10. **Coverage rule:** records with unresolved gender or geography remain in the internal record-level audit workflow but do not enter the G=4 parity calculation. Demographic coverage is reported for every corpus; public reproducibility materials expose aggregate summaries rather than identifiable record-level audit rows.
 11. **Distributional components:** `H_D_prime` is normalised Shannon entropy of resolved document shares; `H_C_prime` is normalised Shannon entropy of resolved citation shares over the same fixed G=4 universe.
 12. **KCDI:** `KCDI = H_D_prime^lambda × H_C_prime^(1-lambda)`.
 13. **KJI architecture:** `KJI=KCDI×P`, with `P=mean[A(u)S(u)]` over the four substantive cells, so `KJI<=KCDI` is architectural.
@@ -40,6 +40,10 @@ This procedure is not interpreted as recovering an author's true or self-identif
 **Interpretation rule:** cross-corpus ordering is not treated as robust when it changes materially between the complete-case analysis and reasonable unresolved-gender sensitivity scenarios. In that case, the result is reported as measurement-sensitive rather than converted into a categorical ranking or epistemic-regime classification.
 
 Matched-size robustness samples documents before demographic filtering and then recomputes G=4 KRATOS, so demographic coverage remains part of each resampled diagnostic. The harmonised common-window anchor is `n=92` for 2010--2025; the full-window anchor is `n=101` for 2006--2025. The default number of draws is `B=1000`. With master seed `20260831`, the matched-size CLI passes `seed + 1` to the sampler, giving effective seed `20260832`; frozen outputs should record the effective seed explicitly.
+
+## Public-release data boundary
+
+Record-level Scopus-derived metadata and record-level demographic-resolution outputs are not part of the public release. The public reproducibility package is limited to code, tests, environment pins, aggregate demographic-resolution summaries, sensitivity and calibration outputs, and non-identifying corpus/resolved-set fingerprints. Record-level materials remain restricted because of source-data licensing and data-protection considerations.
 
 ## Manual-audit reproducibility boundary
 
