@@ -108,7 +108,7 @@ The production Streamlit application accepts CSV files with a citation-count col
 2. an explicit first-author country field; or
 3. precomputed KRATOS demographic audit fields (`group`, `gender_category`, `region`).
 
-For manuscript-grade permutation calibration, use the **exact frozen record-level audit CSV** used to generate the primary KRATOS estimates. Licensed Scopus source records are not committed to this public repository.
+For manuscript-grade permutation calibration, use the **exact frozen record-level audit CSV** used internally to generate the primary KRATOS estimates. Record-level Scopus-derived files and record-level demographic-audit outputs are not committed to, or intended for public redistribution through, this repository.
 
 ## Run locally
 
@@ -125,6 +125,10 @@ The compatibility entrypoint also remains valid:
 streamlit run app_v2_2.py
 ```
 
+## Data distribution boundary
+
+Raw or record-level Scopus-derived metadata are not redistributed through this repository. Record-level demographic-resolution outputs may contain source metadata and inferred analytical classifications and should remain restricted to the internal reproducibility workflow. Public releases should contain code, tests, environment pins, aggregate demographic-resolution summaries, sensitivity outputs, and non-identifying fingerprints only.
+
 ## Reproducibility utilities
 
 - `scripts/kratos_analyze_csv.py`: record-level demographic audit, G=4 group metrics, corpus snapshot, and full-corpus citation concentration.
@@ -136,7 +140,7 @@ streamlit run app_v2_2.py
 
 The master stochastic seed is `20260831`. Principal permutation calibration defaults to `B=50,000` draws. The matched-size CLI deliberately passes `seed + 1` to its sampler, giving effective seed `20260832` under the manuscript default. Manuscript-grade analyses should record the effective seed, draw count, input hashes, and software revision used for each frozen output.
 
-The repository's record-level "demographic audit" files are automatically generated resolution/provenance outputs. A separate stratified manual gender-proxy audit was conducted during development, but its item-selection manifest, random-number seed, and item-level outcomes were not preserved in the archived materials; it is therefore not treated as independently reproducible validation evidence.
+Record-level demographic-audit files are generated only as internal resolution/provenance outputs and are not part of the public reproducibility package. Public archived materials retain aggregate demographic-resolution summaries, sensitivity outputs, code, specifications, and fingerprints. A separate stratified manual gender-proxy audit was conducted during development, but its item-selection manifest, random-number seed, and item-level outcomes were not preserved in the archived materials; it is therefore not treated as independently reproducible validation evidence.
 
 ## Interpretation
 
