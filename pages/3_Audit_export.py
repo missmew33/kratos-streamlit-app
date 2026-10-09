@@ -22,8 +22,15 @@ import app as base
 st.set_page_config(page_title="KRATOS audit export", page_icon="K", layout="wide")
 st.title("KRATOS demographic audit export")
 st.caption(
-    "Reconstruct and archive the exact record-level G=4 analytical layer before "
-    "running manuscript-grade robustness diagnostics."
+    "Reconstruct the exact record-level G=4 analytical layer for restricted internal "
+    "reproducibility work before running manuscript-grade robustness diagnostics."
+)
+
+st.warning(
+    "Record-level audit exports may contain Scopus-derived metadata and inferred analytical "
+    "classifications linked to identifiable authors. Do not commit or publicly redistribute "
+    "these files. Public reproducibility releases should use aggregate summaries and "
+    "non-identifying fingerprints."
 )
 
 uploads = st.file_uploader(
